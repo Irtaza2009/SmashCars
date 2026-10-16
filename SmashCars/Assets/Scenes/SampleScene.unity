@@ -131,6 +131,7 @@ GameObject:
   - component: {fileID: 330585545}
   - component: {fileID: 330585544}
   - component: {fileID: 330585547}
+  - component: {fileID: 330585548}
   m_Layer: 0
   m_Name: Main Camera
   m_TagString: MainCamera
@@ -256,6 +257,23 @@ MonoBehaviour:
     m_VarianceClampScale: 0.9
     m_ContrastAdaptiveSharpening: 0
   m_Version: 2
+--- !u!114 &330585548
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 330585543}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 192edac671ce2fc4089f1caec2692ff1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: '::'
+  target: {fileID: 384519921}
+  distance: 7
+  height: 3.5
+  followSpeed: 8
+  lookAhead: 3
 --- !u!1 &384519917
 GameObject:
   m_ObjectHideFlags: 0
@@ -365,7 +383,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0.5, z: 0}
-  m_LocalScale: {x: 0.9, y: 0.6, z: 1.6}
+  m_LocalScale: {x: 1.8, y: 0.6, z: 3.2}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
@@ -409,15 +427,17 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 36f79eadceeee654c9e30965394e2fe2, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CarController
-  acceleration: 25
-  reverseAcceleration: 12
+  acceleration: 30
+  reverseAcceleration: 18
   maxSpeed: 25
-  brakeStrength: 18
-  turnStrength: 100
-  minimumSteeringSpeed: 0.15
-  lateralGrip: 5
-  driftGrip: 1.5
-  downforce: 2
+  maxReverseSpeed: 10
+  brakeStrength: 22
+  rollingResistance: 0.12
+  turnStrength: 110
+  steeringSpeed: 5
+  lateralGrip: 3
+  driftGrip: 0.8
+  downforce: 0.5
 --- !u!1 &410087039
 GameObject:
   m_ObjectHideFlags: 0
@@ -701,7 +721,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 50, y: 0.2, z: 50}
+  m_LocalScale: {x: 100, y: 0.2, z: 100}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
