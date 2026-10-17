@@ -6,6 +6,9 @@ public class AICarController : MonoBehaviour
     [Header("Target")]
     [SerializeField] private Transform target;
     [SerializeField] private float targetSearchInterval = 1f;
+    [Tooltip("How far ahead of a moving target the car aims. Set to zero for direct pursuit.")]
+    [SerializeField] private float targetPredictionTime = 0.45f;
+    [SerializeField] private float maxTargetPredictionDistance = 8f;
 
     [Header("Wheel Colliders")]
     [SerializeField] private WheelCollider frontLeft;
@@ -33,11 +36,25 @@ public class AICarController : MonoBehaviour
     [SerializeField] private float attackDistance = 12f;
     [SerializeField] private float approachBrakeDistance = 8f;
 
+    [Header("Ram Tactics")]
+    [Tooltip("Distance used as a safety fallback when physics contact events are missed.")]
+    [SerializeField] private float ramContactDistance = 1.25f;
+    [Tooltip("Minimum forward speed for the close-contact fallback, in metres per second.")]
+    [SerializeField] private float ramContactSpeed = 1f;
+    [SerializeField] private float ramRetreatDuration = 1.1f;
+    [SerializeField] private float ramRetreatDistance = 5f;
+    [SerializeField, Range(0.1f, 1f)] private float ramRetreatTorqueMultiplier = 0.85f;
+    [SerializeField] private float ramRetreatCooldown = 0.5f;
+
     [Header("Obstacle Avoidance")]
     [SerializeField] private float obstacleDetectionDistance = 7f;
     [SerializeField] private float obstacleRayHeight = 0.65f;
     [SerializeField] private float obstacleAvoidanceStrength = 1.5f;
     [SerializeField] private float obstacleFrontOffset = 0.8f;
+    [Tooltip("Makes the sensors account for the width of the car instead of only detecting a point ahead.")]
+    [SerializeField] private float obstacleSensorRadius = 0.45f;
+    [SerializeField] private float obstacleSlowdownDistance = 5f;
+    [SerializeField] private float obstacleBrakeDistance = 2.25f;
     [SerializeField] private LayerMask obstacleLayers = ~0;
 
     [Header("Stuck Recovery")]
@@ -45,8 +62,6 @@ public class AICarController : MonoBehaviour
     [SerializeField] private float stuckDetectionTime = 1.4f;
     [SerializeField] private float recoveryDuration = 1.4f;
     [SerializeField] private float recoveryStopSpeed = 1.5f;
-    [SerializeField] private float blockedDistance = 1.5f;
-    [SerializeField] private float minimumStuckDistance = 2f;
     [SerializeField] private float recoveryCooldown = 3f;
     [SerializeField] private float minimumTargetDistanceForRecovery = 4f;
 
@@ -60,19 +75,23 @@ public class AICarController : MonoBehaviour
     [Header("Debug")]
     [SerializeField] private bool showSensorRays = true;
 
-    private static readonly float[] SensorAngles =
-        { -65f, -35f, 0f, 35f, 65f };
-
     private Rigidbody rb;
     private CarHealth carHealth;
+    private Rigidbody targetRigidbody;
+    private readonly RaycastHit[] sensorHits = new RaycastHit[32];
 
     private float currentSteerAngle;
     private float searchTimer;
     private float stuckTimer;
     private float recoveryTimer;
     private float recoverySteerDirection = 1f;
+    private float ramRetreatTimer;
+    private float ramCooldownTimer;
+    private float ramRetreatSteerDirection = 1f;
+    private Vector3 ramRetreatStartPosition;
 
     private bool recovering;
+    private bool ramRetreating;
 
     private void Awake()
     {
@@ -116,6 +135,15 @@ public class AICarController : MonoBehaviour
         if (!WheelsAssigned())
             return;
 
+        ramCooldownTimer -= Time.fixedDeltaTime;
+
+        if (ramRetreating)
+        {
+            PerformRamRetreat();
+            ApplyDownforce();
+            return;
+        }
+
         if (target == null)
         {
             ApplyBrakes(brakeStrength);
@@ -127,12 +155,46 @@ public class AICarController : MonoBehaviour
         ApplyDownforce();
     }
 
+    private void OnCollisionEnter(Collision collision)
+    {
+        if (target == null || ramRetreating || ramCooldownTimer > 0f)
+            return;
+
+        // A hit on any child collider of the target counts as a successful ram.
+        if (collision.collider.transform.root != target.root)
+            return;
+
+        BeginRamRetreat();
+    }
+
     private void FindTarget()
     {
         GameObject player = GameObject.FindGameObjectWithTag("Player");
 
         if (player != null && player.transform.root != transform.root)
+        {
             target = player.transform;
+            targetRigidbody = player.GetComponentInParent<Rigidbody>();
+        }
+    }
+
+    private Vector3 GetAimPosition()
+    {
+        if (target == null || targetRigidbody == null)
+            return target != null ? target.position : transform.position;
+
+        float distance = Vector3.Distance(transform.position, target.position);
+        float predictionTime = Mathf.Min(
+            targetPredictionTime,
+            distance / Mathf.Max(maxSpeed, 0.01f)
+        );
+
+        Vector3 predictedOffset = Vector3.ClampMagnitude(
+            targetRigidbody.linearVelocity * predictionTime,
+            maxTargetPredictionDistance
+        );
+
+        return target.position + predictedOffset;
     }
 
     // Returns the distance to the nearest relevant obstacle.
@@ -150,9 +212,11 @@ public class AICarController : MonoBehaviour
         Vector3 direction =
             Quaternion.AngleAxis(angle, Vector3.up) * forward;
 
-        RaycastHit[] hits = Physics.RaycastAll(
+        int hitCount = Physics.SphereCastNonAlloc(
             origin,
+            obstacleSensorRadius,
             direction,
+            sensorHits,
             obstacleDetectionDistance,
             obstacleLayers,
             QueryTriggerInteraction.Ignore
@@ -160,8 +224,9 @@ public class AICarController : MonoBehaviour
 
         float nearestDistance = obstacleDetectionDistance;
 
-        foreach (RaycastHit hit in hits)
+        for (int i = 0; i < hitCount; i++)
         {
+            RaycastHit hit = sensorHits[i];
             if (hit.transform.root == transform.root)
                 continue;
 
@@ -234,7 +299,7 @@ public class AICarController : MonoBehaviour
 
     private void DriveTowardsTarget()
     {
-        Vector3 toTarget = target.position - transform.position;
+        Vector3 toTarget = GetAimPosition() - transform.position;
         Vector3 flatDirection = Vector3.ProjectOnPlane(
             toTarget, Vector3.up
         );
@@ -260,6 +325,17 @@ public class AICarController : MonoBehaviour
         );
 
         float speed = rb.linearVelocity.magnitude;
+
+        // Collision events are the normal way to detect a ram. This fallback
+        // handles wheel/collider setups that can leave the two cars pressed
+        // together without producing a fresh collision event on later charges.
+        if (distance <= ramContactDistance &&
+            (forwardSpeed >= ramContactSpeed || speed <= stuckSpeed) &&
+            ramCooldownTimer <= 0f)
+        {
+            BeginRamRetreat();
+            return;
+        }
 
         float targetSteer = Mathf.Clamp(angle / 45f, -1f, 1f);
 
@@ -330,8 +406,14 @@ public class AICarController : MonoBehaviour
 
         float speedKmh = speed * 3.6f;
 
+        float stoppingDistance = speed * speed / (2f * 10f);
+        float targetBrakeDistance = Mathf.Max(
+            approachBrakeDistance,
+            stoppingDistance + 1.5f
+        );
+
         bool tooFastNearTarget =
-            distance < approachBrakeDistance && speedKmh > 20f;
+            distance < targetBrakeDistance && speedKmh > 20f;
 
         // Reduce speed before sharp turns instead of permanently
         // braking whenever the target is behind us.
@@ -344,7 +426,10 @@ public class AICarController : MonoBehaviour
         bool shouldBrakeForTurn =
             Mathf.Abs(angle) > 100f && speedKmh > 25f;
 
-        if (tooFastNearTarget || shouldBrakeForTurn)
+        bool mustBrakeForObstacle =
+            frontDistance < obstacleBrakeDistance;
+
+        if (tooFastNearTarget || shouldBrakeForTurn || mustBrakeForObstacle)
         {
             ApplyBrakes(brakeStrength);
             return;
@@ -353,6 +438,15 @@ public class AICarController : MonoBehaviour
         ApplyBrakes(0f);
 
         float throttle = turnFactor;
+
+        // Start slowing before the avoidance steering becomes urgent. This
+        // keeps the car controllable through narrow gaps at high speed.
+        float obstacleSpeedFactor = Mathf.InverseLerp(
+            obstacleBrakeDistance,
+            obstacleSlowdownDistance,
+            frontDistance
+        );
+        throttle *= Mathf.Lerp(0.35f, 1f, obstacleSpeedFactor);
 
         if (forwardSpeed >= maxSpeed)
             throttle = 0f;
@@ -365,6 +459,63 @@ public class AICarController : MonoBehaviour
         // steering handles the detour. If all paths are blocked,
         // stuck detection will trigger reverse recovery.
         SetMotorTorque(acceleration * 120f * throttle);
+    }
+
+    private void BeginRamRetreat()
+    {
+        ramRetreating = true;
+        recovering = false;
+        stuckTimer = 0f;
+        ramRetreatTimer = ramRetreatDuration;
+        ramCooldownTimer = ramRetreatDuration + ramRetreatCooldown;
+        ramRetreatStartPosition = transform.position;
+
+        // Alternate the escape side when the target is directly ahead, so the
+        // AI does not repeat the same line after every collision.
+        float targetSide = Vector3.Dot(
+            transform.right,
+            target.position - transform.position
+        );
+
+        if (Mathf.Abs(targetSide) > 0.2f)
+            ramRetreatSteerDirection = Mathf.Sign(targetSide);
+        else
+            ramRetreatSteerDirection = -ramRetreatSteerDirection;
+    }
+
+    private void PerformRamRetreat()
+    {
+        ramRetreatTimer -= Time.fixedDeltaTime;
+
+        // Counter-steering while reversing creates a short arc away from the
+        // player, leaving enough room to turn back into the next charge.
+        SetSteering(-ramRetreatSteerDirection);
+
+        float forwardSpeed = Vector3.Dot(rb.linearVelocity, transform.forward);
+        if (forwardSpeed > recoveryStopSpeed)
+        {
+            ApplyBrakes(brakeStrength);
+        }
+        else
+        {
+            ApplyBrakes(0f);
+            SetMotorTorque(
+                -acceleration * 120f * ramRetreatTorqueMultiplier
+            );
+        }
+
+        Vector3 retreatOffset = Vector3.ProjectOnPlane(
+            transform.position - ramRetreatStartPosition,
+            Vector3.up
+        );
+
+        if (ramRetreatTimer <= 0f ||
+            retreatOffset.magnitude >= ramRetreatDistance)
+        {
+            ramRetreating = false;
+            recoveryCooldownTimer = recoveryCooldown;
+            lastStuckCheckPosition = transform.position;
+        }
     }
 
     private void BeginRecovery(float turnDirection)

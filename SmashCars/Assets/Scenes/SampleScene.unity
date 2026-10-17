@@ -352,6 +352,7 @@ GameObject:
   - component: {fileID: 50760660}
   - component: {fileID: 50760662}
   - component: {fileID: 50760663}
+  - component: {fileID: 50760664}
   m_Layer: 0
   m_Name: PlayerCar
   m_TagString: Player
@@ -500,6 +501,23 @@ MonoBehaviour:
   m_EditorClassIdentifier: '::'
   carHealth: {fileID: 50760662}
   fallHeight: -15
+--- !u!114 &50760664
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 50760658}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f5d8d56166b8a7641add9917fcea47f5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: '::'
+  collisionEffect: {fileID: 2034946260972315797, guid: 5619e170803cb354ab1786ed87a90ddd, type: 3}
+  minimumImpactSpeed: 5
+  strongImpactSpeed: 20
+  spawnOffset: 0.05
+  destroyAfter: 3
 --- !u!1 &225066141
 GameObject:
   m_ObjectHideFlags: 0
@@ -3896,6 +3914,7 @@ GameObject:
   - component: {fileID: 1700862373}
   - component: {fileID: 1700862372}
   - component: {fileID: 1700862377}
+  - component: {fileID: 1700862378}
   m_Layer: 0
   m_Name: AICar
   m_TagString: Untagged
@@ -4005,6 +4024,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: '::'
   target: {fileID: 0}
   targetSearchInterval: 1
+  targetPredictionTime: 0.45
+  maxTargetPredictionDistance: 8
   frontLeft: {fileID: 1280223010}
   frontRight: {fileID: 1069882140}
   rearLeft: {fileID: 1225936263}
@@ -4014,19 +4035,28 @@ MonoBehaviour:
   rearLeftMesh: {fileID: 13814762}
   rearRightMesh: {fileID: 374574727}
   wheelMeshRotationOffset: {x: 0, y: 0, z: 90}
-  acceleration: 12
+  acceleration: 20
   maxSpeed: 25
   maxReverseSpeed: 6
   maxSteerAngle: 30
   steeringSpeed: 100
   brakeStrength: 2500
   coastBrake: 100
-  attackDistance: 12
-  approachBrakeDistance: 8
+  attackDistance: 0
+  approachBrakeDistance: 0
+  ramContactDistance: 1.25
+  ramContactSpeed: 1
+  ramRetreatDuration: 2
+  ramRetreatDistance: 15
+  ramRetreatTorqueMultiplier: 0.85
+  ramRetreatCooldown: 0.5
   obstacleDetectionDistance: 7
   obstacleRayHeight: 0.65
   obstacleAvoidanceStrength: 1.5
   obstacleFrontOffset: 0.8
+  obstacleSensorRadius: 0.45
+  obstacleSlowdownDistance: 5
+  obstacleBrakeDistance: 2.25
   obstacleLayers:
     serializedVersion: 2
     m_Bits: 4294967295
@@ -4034,15 +4064,28 @@ MonoBehaviour:
   stuckDetectionTime: 1.4
   recoveryDuration: 1.4
   recoveryStopSpeed: 1.5
-  blockedDistance: 1.5
-  minimumStuckDistance: 2
   recoveryCooldown: 2
   minimumTargetDistanceForRecovery: 4
   downforce: 30
   centerOfMassHeight: -0.3
   showSensorRays: 1
-  objectToSpawn: {fileID: 0}
-  spawnInterval: 6
+--- !u!114 &1700862378
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1700862371}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f5d8d56166b8a7641add9917fcea47f5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: '::'
+  collisionEffect: {fileID: 2034946260972315797, guid: 5619e170803cb354ab1786ed87a90ddd, type: 3}
+  minimumImpactSpeed: 5
+  strongImpactSpeed: 20
+  spawnOffset: 0.05
+  destroyAfter: 3
 --- !u!1 &1838376529
 GameObject:
   m_ObjectHideFlags: 0
