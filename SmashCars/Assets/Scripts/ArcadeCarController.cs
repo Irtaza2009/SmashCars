@@ -432,10 +432,17 @@ public class ArcadeCarController : MonoBehaviour
 
     public void ResetCar()
     {
+        // Stop all physics movement first.
         rb.linearVelocity = Vector3.zero;
         rb.angularVelocity = Vector3.zero;
 
-        transform.SetPositionAndRotation(startPosition, startRotation);
+        // Reset the Rigidbody to its original spawn transform.
+        rb.position = startPosition;
+        rb.rotation = startRotation;
+
+        // Clear velocity again in case anything changed it.
+        rb.linearVelocity = Vector3.zero;
+        rb.angularVelocity = Vector3.zero;
 
         if (bodyVisual != null)
             bodyVisual.localRotation = bodyStartLocalRotation;
@@ -453,8 +460,14 @@ public class ArcadeCarController : MonoBehaviour
             frontRight.motorTorque = 0f;
             rearLeft.motorTorque = 0f;
             rearRight.motorTorque = 0f;
+
+            frontLeft.brakeTorque = 0f;
+            frontRight.brakeTorque = 0f;
+            rearLeft.brakeTorque = 0f;
+            rearRight.brakeTorque = 0f;
         }
 
+        Physics.SyncTransforms();
         rb.WakeUp();
     }
 }
