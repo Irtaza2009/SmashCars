@@ -29,6 +29,8 @@ public class ArcadeCarController : MonoBehaviour
     [SerializeField] private float rollAnglePerAcceleration = 0.45f;
     [SerializeField] private float maxVisualPitch = 5f;
     [SerializeField] private float maxVisualRoll = 7f;
+    [Tooltip("Extra body lean while steering, even before lateral acceleration builds up.")]
+    [SerializeField] private float steeringVisualRoll = 3f;
     [SerializeField] private float bodyVisualSmoothness = 5f;
 
     [Header("Driving")]
@@ -135,6 +137,13 @@ public class ArcadeCarController : MonoBehaviour
             characterLoader.SelectedCharacterChanged -= BindModelWheels;
 
         ClearGeneratedWheelMeshes();
+    }
+
+    private void OnDisable()
+    {
+        // Generated cylinders are created after CarHealth caches renderers, so
+        // explicitly remove them when CarHealth disables this controller.
+        DestroyGeneratedWheelMeshes();
     }
 
     private void Update()
@@ -422,8 +431,12 @@ public class ArcadeCarController : MonoBehaviour
             maxVisualPitch
         );
 
+        float steeringRoll = maxSteerAngle > 0f
+            ? -currentSteerAngle / maxSteerAngle * steeringVisualRoll
+            : 0f;
+
         float roll = Mathf.Clamp(
-            -localAcceleration.x * rollAnglePerAcceleration,
+            -localAcceleration.x * rollAnglePerAcceleration + steeringRoll,
             -maxVisualRoll,
             maxVisualRoll
         );
@@ -452,6 +465,7 @@ public class ArcadeCarController : MonoBehaviour
             return;
 
         ClearGeneratedWheelMeshes();
+        BindBodyVisual(carModel.transform);
 
         Renderer[] renderers = carModel.GetComponentsInChildren<Renderer>();
         var usedRenderers = new HashSet<Renderer>();
@@ -482,6 +496,15 @@ public class ArcadeCarController : MonoBehaviour
             rearRight, renderers, usedRenderers, rearRightMesh,
             hasNamedWheelRenderers
         );
+    }
+
+    private void BindBodyVisual(Transform modelTransform)
+    {
+        if (modelTransform == null || bodyVisual == modelTransform)
+            return;
+
+        bodyVisual = modelTransform;
+        bodyStartLocalRotation = bodyVisual.localRotation;
     }
 
     private void BindLegacyWheels()
@@ -599,13 +622,7 @@ public class ArcadeCarController : MonoBehaviour
 
     private void ClearGeneratedWheelMeshes()
     {
-        foreach (GameObject wheelMesh in generatedWheelMeshes)
-        {
-            if (wheelMesh != null)
-                Destroy(wheelMesh);
-        }
-
-        generatedWheelMeshes.Clear();
+        DestroyGeneratedWheelMeshes();
 
         foreach (Renderer renderer in hiddenModelWheelRenderers)
         {
@@ -614,6 +631,17 @@ public class ArcadeCarController : MonoBehaviour
         }
 
         hiddenModelWheelRenderers.Clear();
+    }
+
+    private void DestroyGeneratedWheelMeshes()
+    {
+        foreach (GameObject wheelMesh in generatedWheelMeshes)
+        {
+            if (wheelMesh != null)
+                Destroy(wheelMesh);
+        }
+
+        generatedWheelMeshes.Clear();
     }
 
     private bool IsWheelRenderer(Renderer renderer)

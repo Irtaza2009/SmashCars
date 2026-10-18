@@ -1,6 +1,7 @@
 
 using System.Collections;
 using UnityEngine;
+using TMPro;
 
 public class CarGunController : MonoBehaviour
 {
@@ -15,7 +16,8 @@ public class CarGunController : MonoBehaviour
     [SerializeField] private LayerMask hitLayers = ~0;
 
     [Header("Ammo")]
-    [SerializeField] private int magazineSize = 24;
+    [SerializeField] private int leftMagazineSize = 24;
+    [SerializeField] private int rightMagazineSize = 24;
     [SerializeField] private float reloadDuration = 1.5f;
 
     [Header("Visual Effects")]
@@ -32,23 +34,35 @@ public class CarGunController : MonoBehaviour
     [SerializeField] private KeyCode rightFireKey = KeyCode.E;
     [SerializeField] private KeyCode reloadKey = KeyCode.F;
 
-    private int currentAmmo;
+    [Header("Weapon HUD")]
+    [SerializeField] private TextMeshProUGUI leftAmmoText;
+    [SerializeField] private TextMeshProUGUI rightAmmoText;
+    [SerializeField] private TextMeshProUGUI reloadText;
+
+    private int leftCurrentAmmo;
+    private int rightCurrentAmmo;
     private float nextLeftShotTime;
     private float nextRightShotTime;
     private bool isReloading;
     private CarHealth ownHealth;
     private readonly RaycastHit[] shotHits = new RaycastHit[32];
 
-    public int CurrentAmmo => currentAmmo;
-    public int MagazineSize => magazineSize;
+    public int LeftCurrentAmmo => leftCurrentAmmo;
+    public int RightCurrentAmmo => rightCurrentAmmo;
+    public int LeftMagazineSize => leftMagazineSize;
+    public int RightMagazineSize => rightMagazineSize;
     public bool IsReloading => isReloading;
 
     private void Awake()
     {
         ownHealth = GetComponentInParent<CarHealth>();
-        magazineSize = Mathf.Max(1, magazineSize);
+        leftMagazineSize = Mathf.Max(1, leftMagazineSize);
+        rightMagazineSize = Mathf.Max(1, rightMagazineSize);
         reloadDuration = Mathf.Max(0f, reloadDuration);
-        currentAmmo = magazineSize;
+        leftCurrentAmmo = leftMagazineSize;
+        rightCurrentAmmo = rightMagazineSize;
+        leftAmmoText.text = $"LEFT: {leftCurrentAmmo}/{leftMagazineSize} (Q)";
+        rightAmmoText.text = $"RIGHT: {rightCurrentAmmo}/{rightMagazineSize} (E)";
     }
 
     private void Update()
@@ -70,8 +84,12 @@ public class CarGunController : MonoBehaviour
     {
         if (muzzle == null ||
             isReloading ||
-            currentAmmo <= 0 ||
             fireRate <= 0f)
+        {
+            return;
+        }
+
+        if ((muzzle == leftMuzzle && leftCurrentAmmo <= 0) || (muzzle == rightMuzzle && rightCurrentAmmo <= 0))
         {
             return;
         }
@@ -80,7 +98,16 @@ public class CarGunController : MonoBehaviour
             return;
 
         nextShotTime = Time.time + 1f / fireRate;
-        currentAmmo--;
+        if (muzzle == leftMuzzle)
+        {
+            leftCurrentAmmo--;
+            leftAmmoText.text = $"LEFT: {leftCurrentAmmo}/{leftMagazineSize} (Q)";
+        }
+        else if (muzzle == rightMuzzle)
+        {
+            rightCurrentAmmo--;
+            rightAmmoText.text = $"RIGHT: {rightCurrentAmmo}/{rightMagazineSize} (E)";
+        }
 
         // Muzzle flash
         if (muzzleFlashPrefab != null)
@@ -225,7 +252,7 @@ public class CarGunController : MonoBehaviour
 
     public void StartReload()
     {
-        if (isReloading || currentAmmo == magazineSize)
+        if (isReloading || (leftCurrentAmmo == leftMagazineSize && rightCurrentAmmo == rightMagazineSize))
             return;
 
         StartCoroutine(ReloadRoutine());
@@ -234,10 +261,20 @@ public class CarGunController : MonoBehaviour
     private IEnumerator ReloadRoutine()
     {
         isReloading = true;
+        reloadText.text = "RELOADING...";
 
         yield return new WaitForSeconds(reloadDuration);
 
-        currentAmmo = magazineSize;
+        leftCurrentAmmo = leftMagazineSize;
+        rightCurrentAmmo = rightMagazineSize;
+        leftAmmoText.text = $"LEFT: {leftCurrentAmmo}/{leftMagazineSize} (Q)";
+        rightAmmoText.text = $"RIGHT: {rightCurrentAmmo}/{rightMagazineSize} (E)";
+        reloadText.text = "RELOADED";
+
+        yield return new WaitForSeconds(1f);
+
+        reloadText.text = "Press (F) to RELOAD";
+
         isReloading = false;
     }
 }
