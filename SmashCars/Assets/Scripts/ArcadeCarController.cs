@@ -1,9 +1,15 @@
-
+using System.Collections.Generic;
 using UnityEngine;
 
 [RequireComponent(typeof(Rigidbody))]
 public class ArcadeCarController : MonoBehaviour
 {
+    private sealed class WheelVisual
+    {
+        public Transform transform;
+        public Quaternion rotationOffset;
+    }
+
     [Header("Wheel Colliders")]
     [SerializeField] private WheelCollider frontLeft;
     [SerializeField] private WheelCollider frontRight;
@@ -15,9 +21,6 @@ public class ArcadeCarController : MonoBehaviour
     [SerializeField] private Transform frontRightMesh;
     [SerializeField] private Transform rearLeftMesh;
     [SerializeField] private Transform rearRightMesh;
-
-    [SerializeField] private Vector3 wheelMeshRotationOffset =
-        new Vector3(0f, 0f, 90f);
 
     [Header("Body Visuals")]
     [Tooltip("Assign the visible chassis mesh, not the PlayerCar root.")]
@@ -82,6 +85,15 @@ public class ArcadeCarController : MonoBehaviour
     private Vector3 startPosition;
     private Quaternion startRotation;
     private Quaternion bodyStartLocalRotation;
+    private LoadCharacter characterLoader;
+    private WheelVisual frontLeftVisual;
+    private WheelVisual frontRightVisual;
+    private WheelVisual rearLeftVisual;
+    private WheelVisual rearRightVisual;
+    private readonly List<GameObject> generatedWheelMeshes =
+        new List<GameObject>();
+    private readonly List<Renderer> hiddenModelWheelRenderers =
+        new List<Renderer>();
 
     private void Awake()
     {
@@ -101,6 +113,28 @@ public class ArcadeCarController : MonoBehaviour
         ConfigureWheel(frontRight, frontSidewaysGrip, frontForwardGrip);
         ConfigureWheel(rearLeft, rearSidewaysGrip, rearForwardGrip);
         ConfigureWheel(rearRight, rearSidewaysGrip, rearForwardGrip);
+    }
+
+    private void Start()
+    {
+        characterLoader = FindFirstObjectByType<LoadCharacter>();
+
+        if (characterLoader == null)
+        {
+            BindLegacyWheels();
+            return;
+        }
+
+        characterLoader.SelectedCharacterChanged += BindModelWheels;
+        BindModelWheels(characterLoader.SelectedCharacter);
+    }
+
+    private void OnDestroy()
+    {
+        if (characterLoader != null)
+            characterLoader.SelectedCharacterChanged -= BindModelWheels;
+
+        ClearGeneratedWheelMeshes();
     }
 
     private void Update()
@@ -406,17 +440,214 @@ public class ArcadeCarController : MonoBehaviour
 
     private void UpdateWheelVisuals()
     {
-        UpdateWheelVisual(frontLeft, frontLeftMesh);
-        UpdateWheelVisual(frontRight, frontRightMesh);
-        UpdateWheelVisual(rearLeft, rearLeftMesh);
-        UpdateWheelVisual(rearRight, rearRightMesh);
+        UpdateWheelVisual(frontLeft, frontLeftVisual);
+        UpdateWheelVisual(frontRight, frontRightVisual);
+        UpdateWheelVisual(rearLeft, rearLeftVisual);
+        UpdateWheelVisual(rearRight, rearRightVisual);
+    }
+
+    private void BindModelWheels(GameObject carModel)
+    {
+        if (carModel == null)
+            return;
+
+        ClearGeneratedWheelMeshes();
+
+        Renderer[] renderers = carModel.GetComponentsInChildren<Renderer>();
+        var usedRenderers = new HashSet<Renderer>();
+        bool hasNamedWheelRenderers = false;
+
+        foreach (Renderer renderer in renderers)
+        {
+            if (IsWheelRenderer(renderer))
+            {
+                hasNamedWheelRenderers = true;
+                break;
+            }
+        }
+
+        frontLeftVisual = BindWheelVisual(
+            frontLeft, renderers, usedRenderers, frontLeftMesh,
+            hasNamedWheelRenderers
+        );
+        frontRightVisual = BindWheelVisual(
+            frontRight, renderers, usedRenderers, frontRightMesh,
+            hasNamedWheelRenderers
+        );
+        rearLeftVisual = BindWheelVisual(
+            rearLeft, renderers, usedRenderers, rearLeftMesh,
+            hasNamedWheelRenderers
+        );
+        rearRightVisual = BindWheelVisual(
+            rearRight, renderers, usedRenderers, rearRightMesh,
+            hasNamedWheelRenderers
+        );
+    }
+
+    private void BindLegacyWheels()
+    {
+        ClearGeneratedWheelMeshes();
+        frontLeftVisual = CreateLegacyWheelVisual(frontLeft, frontLeftMesh);
+        frontRightVisual = CreateLegacyWheelVisual(frontRight, frontRightMesh);
+        rearLeftVisual = CreateLegacyWheelVisual(rearLeft, rearLeftMesh);
+        rearRightVisual = CreateLegacyWheelVisual(rearRight, rearRightMesh);
+    }
+
+    private WheelVisual BindWheelVisual(
+        WheelCollider wheel,
+        Renderer[] modelRenderers,
+        HashSet<Renderer> usedRenderers,
+        Transform legacyVisual,
+        bool hasNamedWheelRenderers)
+    {
+        if (wheel == null)
+            return null;
+
+        Renderer closestRenderer = null;
+        float closestDistance = float.PositiveInfinity;
+
+        foreach (Renderer renderer in modelRenderers)
+        {
+            if (!renderer.enabled || usedRenderers.Contains(renderer))
+                continue;
+
+            if (hasNamedWheelRenderers && !IsWheelRenderer(renderer))
+                continue;
+
+            float distance = (renderer.bounds.center - wheel.transform.position)
+                .sqrMagnitude;
+
+            if (distance < closestDistance)
+            {
+                closestDistance = distance;
+                closestRenderer = renderer;
+            }
+        }
+
+        if (closestRenderer == null)
+        {
+            Debug.LogWarning(
+                $"{name}: Could not find a model wheel for {wheel.name}."
+            );
+            return CreateLegacyWheelVisual(wheel, legacyVisual);
+        }
+
+        usedRenderers.Add(closestRenderer);
+
+        // Use the model wheel's bounds to fit the physical wheel collider.
+        // The generated cylinder avoids relying on the imported mesh pivot.
+        wheel.transform.position = closestRenderer.bounds.center;
+        wheel.radius = Mathf.Max(0.05f, closestRenderer.bounds.extents.y);
+
+        wheel.GetWorldPose(out _, out Quaternion wheelRotation);
+
+        if (legacyVisual != null)
+            legacyVisual.gameObject.SetActive(false);
+
+        closestRenderer.enabled = false;
+        hiddenModelWheelRenderers.Add(closestRenderer);
+
+        Transform cylinder = CreateWheelCylinder(
+            closestRenderer,
+            wheel.radius
+        );
+
+        return new WheelVisual
+        {
+            transform = cylinder,
+            rotationOffset = Quaternion.Inverse(wheelRotation) *
+                cylinder.rotation
+        };
+    }
+
+    private Transform CreateWheelCylinder(
+        Renderer sourceRenderer,
+        float radius)
+    {
+        GameObject cylinder = GameObject.CreatePrimitive(
+            PrimitiveType.Cylinder
+        );
+        cylinder.name = $"{sourceRenderer.name} Wheel Visual";
+        cylinder.layer = gameObject.layer;
+
+        Collider cylinderCollider = cylinder.GetComponent<Collider>();
+        if (cylinderCollider != null)
+        {
+            cylinderCollider.enabled = false;
+            Destroy(cylinderCollider);
+        }
+
+        cylinder.transform.SetParent(transform, true);
+        cylinder.transform.position = sourceRenderer.bounds.center;
+        cylinder.transform.rotation = transform.rotation *
+            Quaternion.Euler(0f, 0f, 90f);
+
+        float width = Mathf.Max(0.05f, sourceRenderer.bounds.size.x);
+        cylinder.transform.localScale = new Vector3(
+            radius * 2f,
+            width * 0.5f,
+            radius * 2f
+        );
+
+        MeshRenderer cylinderRenderer = cylinder.GetComponent<MeshRenderer>();
+        if (cylinderRenderer != null && sourceRenderer.sharedMaterial != null)
+            cylinderRenderer.sharedMaterial = sourceRenderer.sharedMaterial;
+
+        generatedWheelMeshes.Add(cylinder);
+        return cylinder.transform;
+    }
+
+    private void ClearGeneratedWheelMeshes()
+    {
+        foreach (GameObject wheelMesh in generatedWheelMeshes)
+        {
+            if (wheelMesh != null)
+                Destroy(wheelMesh);
+        }
+
+        generatedWheelMeshes.Clear();
+
+        foreach (Renderer renderer in hiddenModelWheelRenderers)
+        {
+            if (renderer != null)
+                renderer.enabled = true;
+        }
+
+        hiddenModelWheelRenderers.Clear();
+    }
+
+    private bool IsWheelRenderer(Renderer renderer)
+    {
+        string objectName = renderer.name.ToLowerInvariant();
+        return objectName.Contains("wheel") ||
+               objectName.Contains("tire") ||
+               objectName.Contains("tyre") ||
+               objectName.Contains("rim");
+    }
+
+    private WheelVisual CreateLegacyWheelVisual(
+        WheelCollider wheel,
+        Transform legacyVisual)
+    {
+        if (legacyVisual == null)
+            return null;
+
+        wheel.GetWorldPose(out _, out Quaternion wheelRotation);
+
+        return new WheelVisual
+        {
+            transform = legacyVisual,
+            rotationOffset = Quaternion.Inverse(wheelRotation) *
+                legacyVisual.rotation
+        };
     }
 
     private void UpdateWheelVisual(
         WheelCollider wheel,
-        Transform wheelMesh)
+        WheelVisual wheelVisual)
     {
-        if (wheel == null || wheelMesh == null)
+        if (wheel == null || wheelVisual == null ||
+            wheelVisual.transform == null)
             return;
 
         wheel.GetWorldPose(
@@ -424,9 +655,9 @@ public class ArcadeCarController : MonoBehaviour
             out Quaternion rotation
         );
 
-        wheelMesh.SetPositionAndRotation(
+        wheelVisual.transform.SetPositionAndRotation(
             position,
-            rotation * Quaternion.Euler(wheelMeshRotationOffset)
+            rotation * wheelVisual.rotationOffset
         );
     }
 

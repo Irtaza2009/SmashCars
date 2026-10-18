@@ -1,5 +1,6 @@
 
 using TMPro;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -10,6 +11,8 @@ public class CarHealth : MonoBehaviour
     [SerializeField] private float minImpactSpeed = 4f;
     [SerializeField] private float damagePerSpeed = 2.5f;
     [SerializeField] private float maxCollisionDamage = 30f;
+    [Tooltip("Both cars must separate by this distance before another ram can deal damage.")]
+    [SerializeField] private float collisionDamageRearmDistance = 4f;
 
     [Header("Health HUD")]
     [SerializeField] private Image healthBarFill;
@@ -23,6 +26,10 @@ public class CarHealth : MonoBehaviour
 
     private float currentHealth;
     private bool isEliminated;
+    private readonly HashSet<CarHealth> carsDamagedThisImpact =
+        new HashSet<CarHealth>();
+    private readonly List<CarHealth> carsToRearm =
+        new List<CarHealth>();
 
     public float CurrentHealth => currentHealth;
     public float MaxHealth => maxHealth;
@@ -43,6 +50,27 @@ public class CarHealth : MonoBehaviour
         UpdateHealthUI();
     }
 
+    private void Update()
+    {
+        float rearmDistanceSquared =
+            collisionDamageRearmDistance * collisionDamageRearmDistance;
+
+        carsToRearm.Clear();
+
+        foreach (CarHealth otherCar in carsDamagedThisImpact)
+        {
+            if (otherCar == null ||
+                (otherCar.transform.position - transform.position)
+                    .sqrMagnitude >= rearmDistanceSquared)
+            {
+                carsToRearm.Add(otherCar);
+            }
+        }
+
+        foreach (CarHealth otherCar in carsToRearm)
+            carsDamagedThisImpact.Remove(otherCar);
+    }
+
     private void OnCollisionEnter(Collision collision)
     {
         if (isEliminated)
@@ -54,10 +82,17 @@ public class CarHealth : MonoBehaviour
         if (otherCar == null || otherCar == this || otherCar.IsEliminated)
             return;
 
+        if (carsDamagedThisImpact.Contains(otherCar))
+            return;
+
         float impactSpeed = collision.relativeVelocity.magnitude;
 
         if (impactSpeed < minImpactSpeed)
             return;
+
+        // This latch belongs to this car, so each car independently takes one
+        // hit per ram. Multiple wheel/body contacts cannot add extra damage.
+        carsDamagedThisImpact.Add(otherCar);
 
         float damage = Mathf.Min(
             (impactSpeed - minImpactSpeed) * damagePerSpeed,
