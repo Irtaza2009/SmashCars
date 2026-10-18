@@ -869,6 +869,7 @@ RectTransform:
   m_LocalScale: {x: 0, y: 0, z: 0}
   m_ConstrainProportionsScale: 0
   m_Children:
+  - {fileID: 1773860684}
   - {fileID: 1904182344}
   - {fileID: 1427244894}
   - {fileID: 441434898}
@@ -1382,6 +1383,84 @@ MonoBehaviour:
   m_EffectColor: {r: 0, g: 0, b: 0, a: 0.74509805}
   m_EffectDistance: {x: 5, y: 10}
   m_UseGraphicAlpha: 1
+--- !u!1001 &1773860683
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 1232805706}
+    m_Modifications:
+    - target: {fileID: 3793737625681697229, guid: ef32d842f7e6d49188ab7cc59e75b223, type: 3}
+      propertyPath: m_Name
+      value: Demolition Derby Car
+      objectReference: {fileID: 0}
+    - target: {fileID: 3793737625681697229, guid: ef32d842f7e6d49188ab7cc59e75b223, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4606550103639638903, guid: ef32d842f7e6d49188ab7cc59e75b223, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 3310
+      objectReference: {fileID: 0}
+    - target: {fileID: 4606550103639638903, guid: ef32d842f7e6d49188ab7cc59e75b223, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 3310
+      objectReference: {fileID: 0}
+    - target: {fileID: 4606550103639638903, guid: ef32d842f7e6d49188ab7cc59e75b223, type: 3}
+      propertyPath: m_LocalScale.z
+      value: 3310
+      objectReference: {fileID: 0}
+    - target: {fileID: 4606550103639638903, guid: ef32d842f7e6d49188ab7cc59e75b223, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4606550103639638903, guid: ef32d842f7e6d49188ab7cc59e75b223, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: -40
+      objectReference: {fileID: 0}
+    - target: {fileID: 4606550103639638903, guid: ef32d842f7e6d49188ab7cc59e75b223, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: -240
+      objectReference: {fileID: 0}
+    - target: {fileID: 4606550103639638903, guid: ef32d842f7e6d49188ab7cc59e75b223, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 0.6532815
+      objectReference: {fileID: 0}
+    - target: {fileID: 4606550103639638903, guid: ef32d842f7e6d49188ab7cc59e75b223, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: -0.6532815
+      objectReference: {fileID: 0}
+    - target: {fileID: 4606550103639638903, guid: ef32d842f7e6d49188ab7cc59e75b223, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0.27059805
+      objectReference: {fileID: 0}
+    - target: {fileID: 4606550103639638903, guid: ef32d842f7e6d49188ab7cc59e75b223, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0.27059805
+      objectReference: {fileID: 0}
+    - target: {fileID: 4606550103639638903, guid: ef32d842f7e6d49188ab7cc59e75b223, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: -90
+      objectReference: {fileID: 0}
+    - target: {fileID: 4606550103639638903, guid: ef32d842f7e6d49188ab7cc59e75b223, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 45
+      objectReference: {fileID: 0}
+    - target: {fileID: 4606550103639638903, guid: ef32d842f7e6d49188ab7cc59e75b223, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: ef32d842f7e6d49188ab7cc59e75b223, type: 3}
+--- !u!4 &1773860684 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 4606550103639638903, guid: ef32d842f7e6d49188ab7cc59e75b223, type: 3}
+  m_PrefabInstance: {fileID: 1773860683}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &1788886441
 GameObject:
   m_ObjectHideFlags: 0
@@ -1582,6 +1661,10 @@ PrefabInstance:
     - target: {fileID: 919132149155446097, guid: 2917d3b8edd3b48698d825dc499684d0, type: 3}
       propertyPath: m_Name
       value: Demolition Derby Car
+      objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 2917d3b8edd3b48698d825dc499684d0, type: 3}
+      propertyPath: m_IsActive
+      value: 1
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
