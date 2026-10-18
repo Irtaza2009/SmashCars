@@ -22,15 +22,7 @@ public class CarFallDetector : MonoBehaviour
             carHealth.TakeDamage(carHealth.MaxHealth);
             Debug.Log($"{name} fell out of arena!");
             
-            StartCoroutine(LoadTitleScreen());
         }
-    }
-    private IEnumerator LoadTitleScreen()
-    {
-        yield return new WaitForSeconds(1f);
-
-        UnityEngine.SceneManagement.SceneManager.LoadScene("TitleScreen");
-
     }
 
 }
