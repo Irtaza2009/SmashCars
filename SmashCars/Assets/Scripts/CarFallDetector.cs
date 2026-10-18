@@ -22,4 +22,5 @@ public class CarFallDetector : MonoBehaviour
             Debug.Log($"{name} fell out of arena!");
         }
     }
+
 }
