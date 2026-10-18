@@ -333,6 +333,11 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 147086110}
   m_CullTransparentMesh: 1
+--- !u!1 &246783076 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 3793737625681697229, guid: ef32d842f7e6d49188ab7cc59e75b223, type: 3}
+  m_PrefabInstance: {fileID: 1773860683}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &313529488
 GameObject:
   m_ObjectHideFlags: 0
@@ -1397,7 +1402,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 3793737625681697229, guid: ef32d842f7e6d49188ab7cc59e75b223, type: 3}
       propertyPath: m_IsActive
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 4606550103639638903, guid: ef32d842f7e6d49188ab7cc59e75b223, type: 3}
       propertyPath: m_LocalScale.x
@@ -1454,13 +1459,29 @@ PrefabInstance:
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 3793737625681697229, guid: ef32d842f7e6d49188ab7cc59e75b223, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1773860685}
   m_SourcePrefab: {fileID: 100100000, guid: ef32d842f7e6d49188ab7cc59e75b223, type: 3}
 --- !u!4 &1773860684 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 4606550103639638903, guid: ef32d842f7e6d49188ab7cc59e75b223, type: 3}
   m_PrefabInstance: {fileID: 1773860683}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &1773860685
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 246783076}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c7e8522147dd94dfcaf394da8702f0f2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Spin
+  rotationSpeed: {x: 0, y: 0, z: 45}
 --- !u!1 &1788886441
 GameObject:
   m_ObjectHideFlags: 0
@@ -1664,7 +1685,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: 2917d3b8edd3b48698d825dc499684d0, type: 3}
       propertyPath: m_IsActive
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
