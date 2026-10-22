@@ -756,7 +756,7 @@ MonoBehaviour:
   rollAnglePerAcceleration: 0.45
   maxVisualPitch: 5
   maxVisualRoll: 7
-  steeringVisualRoll: -15
+  steeringVisualRoll: -4
   bodyVisualSmoothness: 5
   acceleration: 30
   reverseAcceleration: 18
