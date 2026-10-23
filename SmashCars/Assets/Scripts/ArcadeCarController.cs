@@ -21,6 +21,7 @@ public class ArcadeCarController : MonoBehaviour
     [SerializeField] private Transform frontRightMesh;
     [SerializeField] private Transform rearLeftMesh;
     [SerializeField] private Transform rearRightMesh;
+    [SerializeField] private Material tyreMaterial;
 
     [Header("Body Visuals")]
     [Tooltip("Assign the visible chassis mesh, not the PlayerCar root.")]
@@ -613,8 +614,8 @@ public class ArcadeCarController : MonoBehaviour
         );
 
         MeshRenderer cylinderRenderer = cylinder.GetComponent<MeshRenderer>();
-        if (cylinderRenderer != null && sourceRenderer.sharedMaterial != null)
-            cylinderRenderer.sharedMaterial = sourceRenderer.sharedMaterial;
+        if (cylinderRenderer != null && tyreMaterial != null)
+            cylinderRenderer.sharedMaterial = tyreMaterial;
 
         generatedWheelMeshes.Add(cylinder);
         return cylinder.transform;

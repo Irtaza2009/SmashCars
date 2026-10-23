@@ -15,6 +15,11 @@ public class CarGunController : MonoBehaviour
     [SerializeField] private float damagePerShot = 10f;
     [SerializeField] private LayerMask hitLayers = ~0;
 
+    [Header("Left Missile Weapon")]
+    [SerializeField] private MissileProjectile missilePrefab;
+    [SerializeField] private float missileSpeed = 35f;
+    [SerializeField] private float missileDamage = 35f;
+
     [Header("Ammo")]
     [SerializeField] private int leftMagazineSize = 24;
     [SerializeField] private int rightMagazineSize = 24;
@@ -122,7 +127,14 @@ public class CarGunController : MonoBehaviour
             Destroy(flash.gameObject, 2f);
         }
 
-        FireHitscanBullet(muzzle);
+        if (muzzle == leftMuzzle)
+        {
+            FireMissile(muzzle);
+        }
+        else
+        {
+            FireHitscanBullet(muzzle);
+        }
     }
 
     private void FireHitscanBullet(Transform muzzle)
@@ -176,9 +188,10 @@ public class CarGunController : MonoBehaviour
                 nearestHit.collider.GetComponentInParent<CarHealth>();
 
             if (hitCar != null && !hitCar.IsEliminated)
+            {
                 Debug.Log($"Gun fired by {name}, hit {hitCar.name}");
                 hitCar.TakeDamage(damagePerShot);
-                hitCar.TakeDamage(damagePerShot);
+            }
         }
 
         // The raycast resolves the shot immediately, while this short moving
@@ -276,5 +289,24 @@ public class CarGunController : MonoBehaviour
         reloadText.text = "Press (F) to RELOAD";
 
         isReloading = false;
+    }
+
+    private void FireMissile(Transform muzzle)
+    {
+        if (missilePrefab == null)
+            return;
+
+        MissileProjectile missile = Instantiate(
+            missilePrefab,
+            muzzle.position,
+            muzzle.rotation
+        );
+
+        missile.Initialize(
+            transform.root,
+            missileSpeed,
+            missileDamage,
+            impactEffectPrefab
+        );
     }
 }
