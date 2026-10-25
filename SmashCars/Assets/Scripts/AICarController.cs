@@ -1,14 +1,41 @@
+using System.Collections.Generic;
+using Unity.AI.Navigation;
 using UnityEngine;
+using UnityEngine.AI;
 
 [RequireComponent(typeof(Rigidbody))]
 public class AICarController : MonoBehaviour
 {
+    private sealed class WheelVisual
+    {
+        public Transform transform;
+        public Quaternion rotationOffset;
+    }
+
     [Header("Target")]
     [SerializeField] private Transform target;
     [SerializeField] private float targetSearchInterval = 1f;
     [Tooltip("How far ahead of a moving target the car aims. Set to zero for direct pursuit.")]
     [SerializeField] private float targetPredictionTime = 0.45f;
     [SerializeField] private float maxTargetPredictionDistance = 8f;
+
+    [Header("NavMesh Pathfinding")]
+    [Tooltip("Follow a NavMesh path to the target (ramps, tracks, overpasses). When off, or when no path exists, the car drives straight at the target.")]
+    [SerializeField] private bool useNavMesh = true;
+    [Tooltip("The NavMeshSurface baked for the car. Its Agent Type is used for all path queries. Leave empty to use the default agent type.")]
+    [SerializeField] private NavMeshSurface navSurface;
+    [SerializeField] private int navAreaMask = NavMesh.AllAreas;
+    [SerializeField] private float repathInterval = 0.35f;
+    [Tooltip("How far a point on the path the car steers towards at standstill.")]
+    [SerializeField] private float pathLookAhead = 5f;
+    [Tooltip("Extra look-ahead per m/s of speed, so fast cars cut corners smoothly instead of zig-zagging.")]
+    [SerializeField] private float pathLookAheadSpeedFactor = 0.25f;
+    [Tooltip("How far from the NavMesh a position may be and still snap onto it.")]
+    [SerializeField] private float navSampleDistance = 3f;
+    [Tooltip("Within this distance, if the NavMesh shows a clear straight line, the car drives straight at the target for accurate ramming.")]
+    [SerializeField] private float directPursuitDistance = 12f;
+    [Tooltip("Direct pursuit is only used when the target is at about the same height (so the car doesn't aim at someone on an overpass).")]
+    [SerializeField] private float maxDirectHeightDifference = 1.5f;
 
     [Header("Wheel Colliders")]
     [SerializeField] private WheelCollider frontLeft;
@@ -17,6 +44,10 @@ public class AICarController : MonoBehaviour
     [SerializeField] private WheelCollider rearRight;
 
     [Header("Wheel Visuals")]
+    [Tooltip("Root of the visible car model. If set, its wheel meshes are replaced with generated cylinders (same as the player). Leave empty to use the legacy meshes below.")]
+    [SerializeField] private Transform carModel;
+    [SerializeField] private Material tyreMaterial;
+    [Header("Legacy Wheel Meshes (used when no Car Model is set)")]
     [SerializeField] private Transform frontLeftMesh;
     [SerializeField] private Transform frontRightMesh;
     [SerializeField] private Transform rearLeftMesh;
@@ -46,7 +77,7 @@ public class AICarController : MonoBehaviour
     [SerializeField, Range(0.1f, 1f)] private float ramRetreatTorqueMultiplier = 0.85f;
     [SerializeField] private float ramRetreatCooldown = 0.5f;
 
-    [Header("Obstacle Avoidance")]
+    [Header("Obstacle Avoidance (local safety net)")]
     [SerializeField] private float obstacleDetectionDistance = 7f;
     [SerializeField] private float obstacleRayHeight = 0.65f;
     [SerializeField] private float obstacleAvoidanceStrength = 1.5f;
@@ -57,6 +88,15 @@ public class AICarController : MonoBehaviour
     [SerializeField] private float obstacleBrakeDistance = 2.25f;
     [SerializeField] private LayerMask obstacleLayers = ~0;
 
+    [Header("Surface Awareness")]
+    [Tooltip("Surfaces flatter than this (degrees from horizontal) are driveable, not obstacles.")]
+    [SerializeField, Range(10f, 60f)] private float maxDrivableSlope = 40f;
+    [Tooltip("Optional: put ramps/tracks on these layers and they are never treated as obstacles.")]
+    [SerializeField] private LayerMask drivableLayers;
+    [Tooltip("Tilt the sensors to follow the ground so ramps are not hit head-on.")]
+    [SerializeField] private bool alignSensorsToGround = true;
+    [SerializeField] private float groundAlignSmoothing = 8f;
+
     [Header("Stuck Recovery")]
     [SerializeField] private float stuckSpeed = 1.2f;
     [SerializeField] private float stuckDetectionTime = 1.4f;
@@ -65,20 +105,23 @@ public class AICarController : MonoBehaviour
     [SerializeField] private float recoveryCooldown = 3f;
     [SerializeField] private float minimumTargetDistanceForRecovery = 4f;
 
-    private Vector3 lastStuckCheckPosition;
-    private float recoveryCooldownTimer;
-
     [Header("Stability")]
     [SerializeField] private float downforce = 30f;
     [SerializeField] private float centerOfMassHeight = -0.3f;
 
     [Header("Debug")]
     [SerializeField] private bool showSensorRays = true;
+    [Tooltip("Yellow = NavMesh path, magenta = point the car is steering towards.")]
+    [SerializeField] private bool showPath = true;
 
     private Rigidbody rb;
     private CarHealth carHealth;
     private Rigidbody targetRigidbody;
     private readonly RaycastHit[] sensorHits = new RaycastHit[32];
+
+    private Vector3 lastStuckCheckPosition;
+    private float recoveryCooldownTimer;
+    private Vector3 groundNormal = Vector3.up;
 
     private float currentSteerAngle;
     private float searchTimer;
@@ -93,10 +136,35 @@ public class AICarController : MonoBehaviour
     private bool recovering;
     private bool ramRetreating;
 
+    // NavMesh path state
+    private NavMeshPath navPath;
+    private readonly Vector3[] pathCorners = new Vector3[64];
+    private int cornerCount;
+    private int pathSegmentIndex;
+    private bool hasPath;
+    private float repathTimer;
+    private bool forceRepath = true;
+    private bool hasValidTargetNavPos;
+    private Vector3 lastValidTargetNavPos;
+
+    private WheelVisual frontLeftVisual;
+    private WheelVisual frontRightVisual;
+    private WheelVisual rearLeftVisual;
+    private WheelVisual rearRightVisual;
+    private readonly List<GameObject> generatedWheelMeshes =
+        new List<GameObject>();
+    private readonly List<Renderer> hiddenModelWheelRenderers =
+        new List<Renderer>();
+
+    // ------------------------------------------------------------------
+    // Unity lifecycle
+    // ------------------------------------------------------------------
+
     private void Awake()
     {
         rb = GetComponent<Rigidbody>();
         carHealth = GetComponent<CarHealth>();
+        navPath = new NavMeshPath();
 
         rb.interpolation = RigidbodyInterpolation.Interpolate;
         rb.centerOfMass = new Vector3(0f, centerOfMassHeight, 0f);
@@ -106,6 +174,23 @@ public class AICarController : MonoBehaviour
     {
         FindTarget();
         lastStuckCheckPosition = transform.position;
+
+        if (carModel != null)
+            BindModelWheels(carModel.gameObject);
+        else
+            BindLegacyWheels();
+    }
+
+    private void OnDestroy()
+    {
+        ClearGeneratedWheelMeshes();
+    }
+
+    private void OnDisable()
+    {
+        // Generated cylinders are created after CarHealth caches renderers, so
+        // explicitly remove them when CarHealth disables this controller.
+        DestroyGeneratedWheelMeshes();
     }
 
     private void Update()
@@ -134,6 +219,8 @@ public class AICarController : MonoBehaviour
 
         if (!WheelsAssigned())
             return;
+
+        UpdateGroundNormal();
 
         ramCooldownTimer -= Time.fixedDeltaTime;
 
@@ -167,6 +254,10 @@ public class AICarController : MonoBehaviour
         BeginRamRetreat();
     }
 
+    // ------------------------------------------------------------------
+    // Targeting
+    // ------------------------------------------------------------------
+
     private void FindTarget()
     {
         GameObject player = GameObject.FindGameObjectWithTag("Player");
@@ -175,6 +266,7 @@ public class AICarController : MonoBehaviour
         {
             target = player.transform;
             targetRigidbody = player.GetComponentInParent<Rigidbody>();
+            forceRepath = true;
         }
     }
 
@@ -197,20 +289,280 @@ public class AICarController : MonoBehaviour
         return target.position + predictedOffset;
     }
 
+    // ------------------------------------------------------------------
+    // NavMesh pathfinding
+    // ------------------------------------------------------------------
+
+    private NavMeshQueryFilter CreateNavFilter()
+    {
+        return new NavMeshQueryFilter
+        {
+            agentTypeID = navSurface != null ? navSurface.agentTypeID : 0,
+            areaMask = navAreaMask
+        };
+    }
+
+    // Recalculates the path every repathInterval seconds (or immediately when
+    // forced). The path is queried from the car's current position, so the
+    // car always follows a fresh route and never needs "waypoint reached" logic.
+    private void UpdatePath(Vector3 aimPosition)
+    {
+        repathTimer -= Time.fixedDeltaTime;
+
+        if (repathTimer > 0f && !forceRepath)
+            return;
+
+        repathTimer = repathInterval;
+        forceRepath = false;
+
+        NavMeshQueryFilter filter = CreateNavFilter();
+
+        if (!NavMesh.SamplePosition(
+                transform.position, out NavMeshHit startHit,
+                navSampleDistance, filter))
+        {
+            hasPath = false;
+            return;
+        }
+
+        Vector3 goal;
+
+        if (NavMesh.SamplePosition(
+                aimPosition, out NavMeshHit goalHit,
+                navSampleDistance, filter))
+        {
+            goal = goalHit.position;
+            lastValidTargetNavPos = goal;
+            hasValidTargetNavPos = true;
+        }
+        else if (hasValidTargetNavPos)
+        {
+            // Target is airborne or off the mesh: head for where it last was.
+            goal = lastValidTargetNavPos;
+        }
+        else
+        {
+            hasPath = false;
+            return;
+        }
+
+        if (NavMesh.CalculatePath(startHit.position, goal, filter, navPath) &&
+            navPath.status != NavMeshPathStatus.PathInvalid)
+        {
+            cornerCount = navPath.GetCornersNonAlloc(pathCorners);
+            pathSegmentIndex = 0;
+            hasPath = cornerCount >= 2;
+        }
+        else
+        {
+            hasPath = false;
+        }
+    }
+
+    // True when the NavMesh has no edge (wall, cliff, hole) between the car
+    // and the target, meaning a straight charge is safe.
+    private bool HasClearNavLine(Vector3 aimPosition)
+    {
+        NavMeshQueryFilter filter = CreateNavFilter();
+
+        if (!NavMesh.SamplePosition(
+                transform.position, out NavMeshHit startHit,
+                navSampleDistance, filter))
+            return false;
+
+        if (!NavMesh.SamplePosition(
+                aimPosition, out NavMeshHit goalHit,
+                navSampleDistance, filter))
+            return false;
+
+        return !NavMesh.Raycast(
+            startHit.position, goalHit.position, out _, filter
+        );
+    }
+
+    // Pure pursuit: find the nearest point on the path, then aim at a point
+    // a look-ahead distance further along it.
+    private bool TryGetPathSteerPoint(
+        float lookAhead,
+        out Vector3 steerPoint,
+        out float remainingDistance,
+        out float upcomingTurnAngle)
+    {
+        steerPoint = transform.position;
+        remainingDistance = 0f;
+        upcomingTurnAngle = 0f;
+
+        if (!hasPath || cornerCount < 2)
+            return false;
+
+        Vector3 position = transform.position;
+        int lastSegment = cornerCount - 2;
+        int firstSegment = Mathf.Min(pathSegmentIndex, lastSegment);
+        int searchEnd = Mathf.Min(lastSegment, firstSegment + 3);
+
+        int bestSegment = firstSegment;
+        float bestSqr = float.PositiveInfinity;
+        Vector3 bestPoint = pathCorners[firstSegment];
+
+        // Only look a few segments ahead so a path that loops back over
+        // itself (spiral ramp, overpass) cannot snap to the wrong level.
+        for (int i = firstSegment; i <= searchEnd; i++)
+        {
+            Vector3 a = pathCorners[i];
+            Vector3 b = pathCorners[i + 1];
+            Vector3 ab = b - a;
+            float lengthSqr = ab.sqrMagnitude;
+
+            float t = lengthSqr > 0.0001f
+                ? Mathf.Clamp01(Vector3.Dot(position - a, ab) / lengthSqr)
+                : 0f;
+
+            Vector3 point = a + ab * t;
+            float sqr = (point - position).sqrMagnitude;
+
+            if (sqr < bestSqr)
+            {
+                bestSqr = sqr;
+                bestSegment = i;
+                bestPoint = point;
+            }
+        }
+
+        pathSegmentIndex = bestSegment;
+
+        steerPoint = PointAlongPath(bestSegment, bestPoint, lookAhead);
+        Vector3 beyond = PointAlongPath(
+            bestSegment, bestPoint, lookAhead * 2f
+        );
+
+        // How sharply the path bends just after the steer point.
+        Vector3 inDirection = Vector3.ProjectOnPlane(
+            steerPoint - position, Vector3.up
+        );
+        Vector3 outDirection = Vector3.ProjectOnPlane(
+            beyond - steerPoint, Vector3.up
+        );
+
+        if (inDirection.sqrMagnitude > 0.01f &&
+            outDirection.sqrMagnitude > 0.01f)
+        {
+            upcomingTurnAngle = Vector3.Angle(inDirection, outDirection);
+        }
+
+        remainingDistance = Vector3.Distance(
+            bestPoint, pathCorners[bestSegment + 1]
+        );
+
+        for (int i = bestSegment + 1; i < cornerCount - 1; i++)
+        {
+            remainingDistance += Vector3.Distance(
+                pathCorners[i], pathCorners[i + 1]
+            );
+        }
+
+        return true;
+    }
+
+    private Vector3 PointAlongPath(
+        int segment, Vector3 from, float distance)
+    {
+        Vector3 current = from;
+
+        for (int i = segment; i < cornerCount - 1; i++)
+        {
+            Vector3 end = pathCorners[i + 1];
+            float segmentLength = Vector3.Distance(current, end);
+
+            if (segmentLength >= distance)
+            {
+                return current + (end - current)
+                    / Mathf.Max(segmentLength, 0.0001f) * distance;
+            }
+
+            distance -= segmentLength;
+            current = end;
+        }
+
+        return pathCorners[cornerCount - 1];
+    }
+
+    private void DrawPath(Vector3 steerPoint)
+    {
+        if (!showPath)
+            return;
+
+        Vector3 lift = Vector3.up * 0.3f;
+
+        if (hasPath)
+        {
+            for (int i = 0; i < cornerCount - 1; i++)
+            {
+                Debug.DrawLine(
+                    pathCorners[i] + lift,
+                    pathCorners[i + 1] + lift,
+                    Color.yellow
+                );
+            }
+        }
+
+        Debug.DrawLine(
+            transform.position + Vector3.up,
+            steerPoint + Vector3.up,
+            Color.magenta
+        );
+    }
+
+    // ------------------------------------------------------------------
+    // Surface awareness and obstacle sensing
+    // ------------------------------------------------------------------
+
+    // Averages the normals under the wheels. Falls back to "up" when airborne.
+    private void UpdateGroundNormal()
+    {
+        Vector3 sum = Vector3.zero;
+        int count = 0;
+
+        AddWheelNormal(frontLeft, ref sum, ref count);
+        AddWheelNormal(frontRight, ref sum, ref count);
+        AddWheelNormal(rearLeft, ref sum, ref count);
+        AddWheelNormal(rearRight, ref sum, ref count);
+
+        Vector3 desired = count > 0 ? (sum / count).normalized : Vector3.up;
+
+        groundNormal = Vector3.Slerp(
+            groundNormal,
+            desired,
+            groundAlignSmoothing * Time.fixedDeltaTime
+        ).normalized;
+    }
+
+    private static void AddWheelNormal(
+        WheelCollider wheel, ref Vector3 sum, ref int count)
+    {
+        if (wheel.GetGroundHit(out WheelHit hit))
+        {
+            sum += hit.normal;
+            count++;
+        }
+    }
+
     // Returns the distance to the nearest relevant obstacle.
-    // The car itself and the intended target are ignored.
+    // The car itself, the intended target and drivable surfaces are ignored.
     private float GetClearance(float angle)
     {
+        Vector3 up = alignSensorsToGround ? groundNormal : Vector3.up;
+
         Vector3 origin = transform.position
-            + Vector3.up * obstacleRayHeight
+            + up * obstacleRayHeight
             + transform.forward * obstacleFrontOffset;
 
-        Vector3 forward = Vector3.ProjectOnPlane(
-            transform.forward, Vector3.up
-        ).normalized;
+        Vector3 forward = Vector3.ProjectOnPlane(transform.forward, up)
+            .normalized;
 
-        Vector3 direction =
-            Quaternion.AngleAxis(angle, Vector3.up) * forward;
+        Vector3 direction = Quaternion.AngleAxis(angle, up) * forward;
+
+        // Drivable layers are excluded from the cast entirely.
+        int mask = obstacleLayers & ~drivableLayers;
 
         int hitCount = Physics.SphereCastNonAlloc(
             origin,
@@ -218,7 +570,7 @@ public class AICarController : MonoBehaviour
             direction,
             sensorHits,
             obstacleDetectionDistance,
-            obstacleLayers,
+            mask,
             QueryTriggerInteraction.Ignore
         );
 
@@ -227,13 +579,21 @@ public class AICarController : MonoBehaviour
         for (int i = 0; i < hitCount; i++)
         {
             RaycastHit hit = sensorHits[i];
+
             if (hit.transform.root == transform.root)
                 continue;
 
             // Do not steer away from the player we are attacking.
-            if (target != null &&
-                hit.transform.root == target.root)
+            if (target != null && hit.transform.root == target.root)
                 continue;
+
+            // Ramps and sloped tracks are roads, not walls.
+            if (IsDrivableSurface(hit, origin, direction))
+            {
+                if (showSensorRays)
+                    Debug.DrawLine(origin, hit.point, Color.cyan);
+                continue;
+            }
 
             if (hit.distance < nearestDistance)
                 nearestDistance = hit.distance;
@@ -251,6 +611,38 @@ public class AICarController : MonoBehaviour
         }
 
         return nearestDistance;
+    }
+
+    private bool IsDrivableSurface(
+        RaycastHit hit, Vector3 origin, Vector3 direction)
+    {
+        Vector3 normal = hit.normal;
+
+        // If the sphere starts inside a collider, Unity reports distance 0 and
+        // the normal is just -direction (always "vertical"). Re-query the real
+        // surface normal directly from that collider.
+        if (hit.distance <= 0.001f)
+        {
+            if (hit.collider.Raycast(
+                    new Ray(origin, direction), out RaycastHit exact,
+                    obstacleDetectionDistance))
+            {
+                normal = exact.normal;
+            }
+            else if (hit.collider.Raycast(
+                    new Ray(origin, Vector3.down), out exact,
+                    obstacleRayHeight + obstacleSensorRadius + 1f))
+            {
+                normal = exact.normal;
+            }
+            else
+            {
+                return false; // can't tell, play it safe
+            }
+        }
+
+        // Compare against world up: a 20° ramp is 20° however the car is tilted.
+        return Vector3.Angle(normal, Vector3.up) <= maxDrivableSlope;
     }
 
     // Positive steering turns right; negative steering turns left.
@@ -297,45 +689,92 @@ public class AICarController : MonoBehaviour
         return sideAvoidance;
     }
 
+    // ------------------------------------------------------------------
+    // Driving
+    // ------------------------------------------------------------------
+
     private void DriveTowardsTarget()
     {
-        Vector3 toTarget = GetAimPosition() - transform.position;
-        Vector3 flatDirection = Vector3.ProjectOnPlane(
-            toTarget, Vector3.up
-        );
+        Vector3 aimPosition = GetAimPosition();
+        Vector3 toAim = aimPosition - transform.position;
 
-        if (flatDirection.sqrMagnitude < 0.01f)
+        if (toAim.sqrMagnitude < 0.01f)
         {
             ApplyBrakes(coastBrake);
             SetSteering(0f);
             return;
         }
 
-        float distance = flatDirection.magnitude;
-
-        float angle = Vector3.SignedAngle(
-            transform.forward,
-            flatDirection.normalized,
-            Vector3.up
-        );
+        float speed = rb.linearVelocity.magnitude;
 
         float forwardSpeed = Vector3.Dot(
             rb.linearVelocity,
             transform.forward
         );
 
-        float speed = rb.linearVelocity.magnitude;
+        // True 3D distance, so a target on an overpass above us does not
+        // count as "in ramming range".
+        float directDistance = Vector3.Distance(
+            transform.position, target.position
+        );
 
         // Collision events are the normal way to detect a ram. This fallback
         // handles wheel/collider setups that can leave the two cars pressed
         // together without producing a fresh collision event on later charges.
-        if (distance <= ramContactDistance &&
+        if (directDistance <= ramContactDistance &&
             (forwardSpeed >= ramContactSpeed || speed <= stuckSpeed) &&
             ramCooldownTimer <= 0f)
         {
             BeginRamRetreat();
             return;
         }
+
+        // --- Decide where to steer -------------------------------------
+        // Default: charge straight at the aim position.
+        Vector3 steerPoint = aimPosition;
+        float approachDistance = Vector3.ProjectOnPlane(
+            toAim, Vector3.up
+        ).magnitude;
+        float upcomingTurn = 0f;
+
+        if (useNavMesh)
+        {
+            UpdatePath(aimPosition);
+
+            // Close, level and with nothing in between: skip the path and
+            // aim directly so the ram stays accurate.
+            bool chargeDirectly =
+                directDistance < directPursuitDistance &&
+                Mathf.Abs(toAim.y) < maxDirectHeightDifference &&
+                HasClearNavLine(aimPosition);
+
+            if (!chargeDirectly &&
+                TryGetPathSteerPoint(
+                    pathLookAhead + speed * pathLookAheadSpeedFactor,
+                    out Vector3 pathPoint,
+                    out float remaining,
+                    out float turnAngle))
+            {
+                steerPoint = pathPoint;
+                approachDistance = remaining;
+                upcomingTurn = turnAngle;
+            }
+        }
+
+        DrawPath(steerPoint);
+
+        Vector3 flatDirection = Vector3.ProjectOnPlane(
+            steerPoint - transform.position, Vector3.up
+        );
+
+        if (flatDirection.sqrMagnitude < 0.01f)
+            flatDirection = transform.forward;
+
+        float angle = Vector3.SignedAngle(
+            transform.forward,
+            flatDirection.normalized,
+            Vector3.up
+        );
 
         float targetSteer = Mathf.Clamp(angle / 45f, -1f, 1f);
 
@@ -370,7 +809,7 @@ public class AICarController : MonoBehaviour
         lastStuckCheckPosition = transform.position;
 
         bool farFromTarget =
-            distance > minimumTargetDistanceForRecovery;
+            approachDistance > minimumTargetDistanceForRecovery;
 
         bool barelyMoving =
             speed < stuckSpeed &&
@@ -413,10 +852,10 @@ public class AICarController : MonoBehaviour
         );
 
         bool tooFastNearTarget =
-            distance < targetBrakeDistance && speedKmh > 20f;
+            approachDistance < targetBrakeDistance && speedKmh > 20f;
 
         // Reduce speed before sharp turns instead of permanently
-        // braking whenever the target is behind us.
+        // braking whenever the steer point is behind us.
         float turnFactor = Mathf.Lerp(
             1f,
             0.35f,
@@ -439,6 +878,13 @@ public class AICarController : MonoBehaviour
 
         float throttle = turnFactor;
 
+        // Slow down for a bend in the path before reaching it.
+        throttle *= Mathf.Lerp(
+            1f,
+            0.55f,
+            Mathf.InverseLerp(30f, 100f, upcomingTurn)
+        );
+
         // Start slowing before the avoidance steering becomes urgent. This
         // keeps the car controllable through narrow gaps at high speed.
         float obstacleSpeedFactor = Mathf.InverseLerp(
@@ -452,7 +898,7 @@ public class AICarController : MonoBehaviour
             throttle = 0f;
 
         // Ease off slightly during the final approach.
-        if (distance < attackDistance && speedKmh > 35f)
+        if (approachDistance < attackDistance && speedKmh > 35f)
             throttle *= 0.75f;
 
         // If the route is blocked but one side is available,
@@ -515,6 +961,7 @@ public class AICarController : MonoBehaviour
             ramRetreating = false;
             recoveryCooldownTimer = recoveryCooldown;
             lastStuckCheckPosition = transform.position;
+            forceRepath = true;
         }
     }
 
@@ -557,6 +1004,7 @@ public class AICarController : MonoBehaviour
             stuckTimer = 0f;
             recoveryCooldownTimer = recoveryCooldown;
             lastStuckCheckPosition = transform.position;
+            forceRepath = true;
         }
     }
 
@@ -653,19 +1101,24 @@ public class AICarController : MonoBehaviour
         }
     }
 
+    // ------------------------------------------------------------------
+    // Wheel visuals (mirrors the player controller)
+    // ------------------------------------------------------------------
+
     private void UpdateWheelVisuals()
     {
-        UpdateWheelVisual(frontLeft, frontLeftMesh);
-        UpdateWheelVisual(frontRight, frontRightMesh);
-        UpdateWheelVisual(rearLeft, rearLeftMesh);
-        UpdateWheelVisual(rearRight, rearRightMesh);
+        UpdateWheelVisual(frontLeft, frontLeftVisual);
+        UpdateWheelVisual(frontRight, frontRightVisual);
+        UpdateWheelVisual(rearLeft, rearLeftVisual);
+        UpdateWheelVisual(rearRight, rearRightVisual);
     }
 
     private void UpdateWheelVisual(
         WheelCollider wheel,
-        Transform wheelMesh)
+        WheelVisual wheelVisual)
     {
-        if (wheel == null || wheelMesh == null)
+        if (wheel == null || wheelVisual == null ||
+            wheelVisual.transform == null)
             return;
 
         wheel.GetWorldPose(
@@ -673,9 +1126,215 @@ public class AICarController : MonoBehaviour
             out Quaternion rotation
         );
 
-        wheelMesh.SetPositionAndRotation(
+        wheelVisual.transform.SetPositionAndRotation(
             position,
-            rotation * Quaternion.Euler(wheelMeshRotationOffset)
+            rotation * wheelVisual.rotationOffset
         );
+    }
+
+    private void BindModelWheels(GameObject model)
+    {
+        if (model == null || !WheelsAssigned())
+        {
+            BindLegacyWheels();
+            return;
+        }
+
+        ClearGeneratedWheelMeshes();
+
+        Renderer[] renderers = model.GetComponentsInChildren<Renderer>();
+        var usedRenderers = new HashSet<Renderer>();
+        bool hasNamedWheelRenderers = false;
+
+        foreach (Renderer renderer in renderers)
+        {
+            if (IsWheelRenderer(renderer))
+            {
+                hasNamedWheelRenderers = true;
+                break;
+            }
+        }
+
+        frontLeftVisual = BindWheelVisual(
+            frontLeft, renderers, usedRenderers, frontLeftMesh,
+            hasNamedWheelRenderers
+        );
+        frontRightVisual = BindWheelVisual(
+            frontRight, renderers, usedRenderers, frontRightMesh,
+            hasNamedWheelRenderers
+        );
+        rearLeftVisual = BindWheelVisual(
+            rearLeft, renderers, usedRenderers, rearLeftMesh,
+            hasNamedWheelRenderers
+        );
+        rearRightVisual = BindWheelVisual(
+            rearRight, renderers, usedRenderers, rearRightMesh,
+            hasNamedWheelRenderers
+        );
+    }
+
+    private void BindLegacyWheels()
+    {
+        ClearGeneratedWheelMeshes();
+        frontLeftVisual = CreateLegacyWheelVisual(frontLeftMesh);
+        frontRightVisual = CreateLegacyWheelVisual(frontRightMesh);
+        rearLeftVisual = CreateLegacyWheelVisual(rearLeftMesh);
+        rearRightVisual = CreateLegacyWheelVisual(rearRightMesh);
+    }
+
+    private WheelVisual BindWheelVisual(
+        WheelCollider wheel,
+        Renderer[] modelRenderers,
+        HashSet<Renderer> usedRenderers,
+        Transform legacyVisual,
+        bool hasNamedWheelRenderers)
+    {
+        if (wheel == null)
+            return null;
+
+        Renderer closestRenderer = null;
+        float closestDistance = float.PositiveInfinity;
+
+        foreach (Renderer renderer in modelRenderers)
+        {
+            if (!renderer.enabled || usedRenderers.Contains(renderer))
+                continue;
+
+            // Skip cylinders we generated earlier.
+            if (generatedWheelMeshes.Contains(renderer.gameObject))
+                continue;
+
+            if (hasNamedWheelRenderers && !IsWheelRenderer(renderer))
+                continue;
+
+            float distance =
+                (renderer.bounds.center - wheel.transform.position)
+                .sqrMagnitude;
+
+            if (distance < closestDistance)
+            {
+                closestDistance = distance;
+                closestRenderer = renderer;
+            }
+        }
+
+        if (closestRenderer == null)
+        {
+            Debug.LogWarning(
+                $"{name}: Could not find a model wheel for {wheel.name}."
+            );
+            return CreateLegacyWheelVisual(legacyVisual);
+        }
+
+        usedRenderers.Add(closestRenderer);
+
+        // Use the model wheel's bounds to fit the physical wheel collider.
+        // The generated cylinder avoids relying on the imported mesh pivot.
+        wheel.transform.position = closestRenderer.bounds.center;
+        wheel.radius = Mathf.Max(0.05f, closestRenderer.bounds.extents.y);
+
+        wheel.GetWorldPose(out _, out Quaternion wheelRotation);
+
+        if (legacyVisual != null)
+            legacyVisual.gameObject.SetActive(false);
+
+        closestRenderer.enabled = false;
+        hiddenModelWheelRenderers.Add(closestRenderer);
+
+        Transform cylinder = CreateWheelCylinder(
+            closestRenderer,
+            wheel.radius
+        );
+
+        return new WheelVisual
+        {
+            transform = cylinder,
+            rotationOffset = Quaternion.Inverse(wheelRotation) *
+                cylinder.rotation
+        };
+    }
+
+    private Transform CreateWheelCylinder(
+        Renderer sourceRenderer,
+        float radius)
+    {
+        GameObject cylinder = GameObject.CreatePrimitive(
+            PrimitiveType.Cylinder
+        );
+        cylinder.name = $"{sourceRenderer.name} Wheel Visual";
+        cylinder.layer = gameObject.layer;
+
+        Collider cylinderCollider = cylinder.GetComponent<Collider>();
+        if (cylinderCollider != null)
+        {
+            cylinderCollider.enabled = false;
+            Destroy(cylinderCollider);
+        }
+
+        cylinder.transform.SetParent(transform, true);
+        cylinder.transform.position = sourceRenderer.bounds.center;
+        cylinder.transform.rotation = transform.rotation *
+            Quaternion.Euler(0f, 0f, 90f);
+
+        float width = Mathf.Max(0.05f, sourceRenderer.bounds.size.x);
+        cylinder.transform.localScale = new Vector3(
+            radius * 2f,
+            width * 0.5f,
+            radius * 2f
+        );
+
+        MeshRenderer cylinderRenderer = cylinder.GetComponent<MeshRenderer>();
+        if (cylinderRenderer != null && tyreMaterial != null)
+            cylinderRenderer.sharedMaterial = tyreMaterial;
+
+        generatedWheelMeshes.Add(cylinder);
+        return cylinder.transform;
+    }
+
+    private WheelVisual CreateLegacyWheelVisual(Transform legacyVisual)
+    {
+        if (legacyVisual == null)
+            return null;
+
+        legacyVisual.gameObject.SetActive(true);
+
+        return new WheelVisual
+        {
+            transform = legacyVisual,
+            rotationOffset = Quaternion.Euler(wheelMeshRotationOffset)
+        };
+    }
+
+    private void ClearGeneratedWheelMeshes()
+    {
+        DestroyGeneratedWheelMeshes();
+
+        foreach (Renderer renderer in hiddenModelWheelRenderers)
+        {
+            if (renderer != null)
+                renderer.enabled = true;
+        }
+
+        hiddenModelWheelRenderers.Clear();
+    }
+
+    private void DestroyGeneratedWheelMeshes()
+    {
+        foreach (GameObject wheelMesh in generatedWheelMeshes)
+        {
+            if (wheelMesh != null)
+                Destroy(wheelMesh);
+        }
+
+        generatedWheelMeshes.Clear();
+    }
+
+    private bool IsWheelRenderer(Renderer renderer)
+    {
+        string objectName = renderer.name.ToLowerInvariant();
+        return objectName.Contains("wheel") ||
+               objectName.Contains("tire") ||
+               objectName.Contains("tyre") ||
+               objectName.Contains("rim");
     }
 }
