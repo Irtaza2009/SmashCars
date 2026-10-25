@@ -1,3 +1,4 @@
+using Unity.VisualScripting;
 using UnityEngine;
 
 public class Cars : MonoBehaviour
@@ -5,6 +6,16 @@ public class Cars : MonoBehaviour
     public GameObject[] cars;
 
     public int selectedCar = 0;
+
+    void Start()
+    {
+        for (int i = 0; i < cars.Length; i++)
+        {
+            cars[i].SetActive(false);
+        }
+
+        cars[selectedCar].SetActive(true);
+    }
 
     public void NextCar()
     {
