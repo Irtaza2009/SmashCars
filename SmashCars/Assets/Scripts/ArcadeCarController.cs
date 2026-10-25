@@ -23,6 +23,13 @@ public class ArcadeCarController : MonoBehaviour
     [SerializeField] private Transform rearRightMesh;
     [SerializeField] private Material tyreMaterial;
 
+    [Header("Tyre Smoke")]
+    [Tooltip("Looping, World-space particle systems, one per rear tyre. Either can be left empty.")]
+    [SerializeField] private ParticleSystem rearLeftSmoke;
+    [SerializeField] private ParticleSystem rearRightSmoke;
+    [Tooltip("Minimum speed (m/s) before the handbrake produces smoke.")]
+    [SerializeField] private float smokeMinSpeed = 3f;
+
     [Header("Body Visuals")]
     [Tooltip("Assign the visible chassis mesh, not the PlayerCar root.")]
     [SerializeField] private Transform bodyVisual;
@@ -145,6 +152,7 @@ public class ArcadeCarController : MonoBehaviour
         // Generated cylinders are created after CarHealth caches renderers, so
         // explicitly remove them when CarHealth disables this controller.
         DestroyGeneratedWheelMeshes();
+        StopTyreSmoke();
     }
 
     private void Update()
@@ -163,6 +171,7 @@ public class ArcadeCarController : MonoBehaviour
             ResetCar();
 
         UpdateWheelVisuals();
+        UpdateTyreSmoke();
     }
 
     private void FixedUpdate()
@@ -688,6 +697,50 @@ public class ArcadeCarController : MonoBehaviour
             position,
             rotation * wheelVisual.rotationOffset
         );
+    }
+
+    private void UpdateTyreSmoke()
+{
+    bool drifting = handbrake &&
+                    rb.linearVelocity.magnitude > smokeMinSpeed;
+
+    SetSmoke(rearLeftSmoke, rearLeft, drifting);
+    SetSmoke(rearRightSmoke, rearRight, drifting);
+}
+
+    private void SetSmoke(
+        ParticleSystem smoke,
+        WheelCollider wheel,
+        bool drifting)
+    {
+        if (smoke == null || wheel == null)
+            return;
+
+        if (!smoke.isPlaying)
+            smoke.Play();
+
+        ParticleSystem.EmissionModule emission = smoke.emission;
+        emission.enabled = drifting && wheel.isGrounded;
+
+        // Sit the emitter at the bottom of the tyre.
+        wheel.GetWorldPose(out Vector3 wheelPosition, out _);
+        smoke.transform.position =
+            wheelPosition - wheel.transform.up * wheel.radius;
+    }
+
+    private void StopTyreSmoke()
+    {
+        SetEmission(rearLeftSmoke, false);
+        SetEmission(rearRightSmoke, false);
+    }
+
+    private static void SetEmission(ParticleSystem smoke, bool enabled)
+    {
+        if (smoke == null)
+            return;
+
+        ParticleSystem.EmissionModule emission = smoke.emission;
+        emission.enabled = enabled;
     }
 
     public void ResetCar()
