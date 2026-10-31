@@ -10,6 +10,9 @@ public class ArcadeCarController : MonoBehaviour
         public Quaternion rotationOffset;
     }
 
+    [Header("Local Split Screen Multiplayer")]
+    [SerializeField] private bool player2Controls = false;
+
     [Header("Wheel Colliders")]
     [SerializeField] private WheelCollider frontLeft;
     [SerializeField] private WheelCollider frontRight;
@@ -87,8 +90,6 @@ public class ArcadeCarController : MonoBehaviour
     private float throttleInput;
     private float steerInput;
     private bool handbrake;
-    private bool footbrake;
-
     private float currentSteerAngle;
     private Vector3 previousVelocity;
     private Vector3 localAcceleration;
@@ -157,15 +158,44 @@ public class ArcadeCarController : MonoBehaviour
 
     private void Update()
     {
-        throttleInput = Input.GetAxisRaw("Vertical");
-        steerInput = Input.GetAxisRaw("Horizontal");
-
-        footbrake = Input.GetKey(KeyCode.Space);
-        handbrake = Input.GetKey(KeyCode.LeftShift);
-
-        // Brakes always take priority over throttle.
-        if (footbrake)
+        if (player2Controls)
+        {
             throttleInput = 0f;
+            steerInput = 0f;
+
+            if (Input.GetKey(KeyCode.UpArrow))
+                throttleInput += 1f;
+
+            if (Input.GetKey(KeyCode.DownArrow))
+                throttleInput -= 1f;
+
+            if (Input.GetKey(KeyCode.LeftArrow))
+                steerInput -= 1f;
+
+            if (Input.GetKey(KeyCode.RightArrow))
+                steerInput += 1f;
+
+            handbrake = Input.GetKey(KeyCode.RightControl);
+        }
+        else
+        {
+            throttleInput = 0f;
+            steerInput = 0f;
+
+            if (Input.GetKey(KeyCode.W))
+                throttleInput += 1f;
+
+            if (Input.GetKey(KeyCode.S))
+                throttleInput -= 1f;
+
+            if (Input.GetKey(KeyCode.A))
+                steerInput -= 1f;
+
+            if (Input.GetKey(KeyCode.D))
+                steerInput += 1f;
+
+            handbrake = Input.GetKey(KeyCode.LeftShift);
+        }
 
         if (Input.GetKeyDown(resetKey))
             ResetCar();
@@ -270,7 +300,7 @@ public class ArcadeCarController : MonoBehaviour
         );
 
         // Never drive against an active brake.
-        if (footbrake || handbrake)
+        if (handbrake)
         {
             SetMotorTorque(0f);
             return;
@@ -318,7 +348,7 @@ public class ArcadeCarController : MonoBehaviour
         float frontBrake = 0f;
         float rearBrake = 0f;
 
-        if (footbrake || changingDirection)
+        if (changingDirection)
         {
             frontBrake = brakeStrength;
             rearBrake = brakeStrength;
@@ -339,7 +369,6 @@ public class ArcadeCarController : MonoBehaviour
 
         // Stop residual movement near zero speed.
         bool wantsToStop =
-            footbrake ||
             handbrake ||
             changingDirection ||
             Mathf.Abs(throttleInput) < 0.01f;

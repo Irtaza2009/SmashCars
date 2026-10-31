@@ -4,6 +4,9 @@ using UnityEngine.UI;
 
 public class CarHUD : MonoBehaviour
 {
+    [Header("Player 2 Controls")]
+    [SerializeField] private bool player2Controls = false;
+
     [Header("Car")]
     [SerializeField] private Rigidbody carRigidbody;
 
@@ -47,9 +50,18 @@ public class CarHUD : MonoBehaviour
                 speedKmh / Mathf.Max(1f, maxSpeedKmh)
             );
 
+        bool handbrakeOn = false;
+
         if (handbrakeText != null)
         {
-            bool handbrakeOn = Input.GetKey(KeyCode.LeftShift);
+            if (player2Controls)
+            {
+                handbrakeOn = Input.GetKey(KeyCode.RightControl);
+            }
+            else
+            {
+                handbrakeOn = Input.GetKey(KeyCode.LeftShift);
+            }
 
             handbrakeText.text = handbrakeOn
                 ? "HANDBRAKE: ON"

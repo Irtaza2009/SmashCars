@@ -280,13 +280,13 @@ public class CarGunController : MonoBehaviour
 
         leftCurrentAmmo = leftMagazineSize;
         rightCurrentAmmo = rightMagazineSize;
-        leftAmmoText.text = $"LEFT: {leftCurrentAmmo}/{leftMagazineSize} (Q)";
-        rightAmmoText.text = $"RIGHT: {rightCurrentAmmo}/{rightMagazineSize} (E)";
+        leftAmmoText.text = $"LEFT: {leftCurrentAmmo}/{leftMagazineSize} ({leftFireKey.ToString()})";
+        rightAmmoText.text = $"RIGHT: {rightCurrentAmmo}/{rightMagazineSize} ({rightFireKey.ToString()})";
         reloadText.text = "RELOADED";
 
         yield return new WaitForSeconds(1f);
 
-        reloadText.text = "Press (F) to RELOAD";
+        reloadText.text = $"Press ({reloadKey.ToString()}) to RELOAD";
 
         isReloading = false;
     }
