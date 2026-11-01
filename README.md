@@ -4,31 +4,44 @@
 
 Drive cars in an arena, use your weapons, or ram other cars, and try to be the last car standing to win!!
 
-Going to add multiplayer next week!!
+There are **3 different tracks** (all made by us from scratch!), and you randomly spawn in one each time!
 
-## The game is semi-functional right now, will be properly working next week!!
+All 3d models are made by us!!
 
-So we will ship it next week for week 6!
+With **split-screen 2-player local multiplayer**!!
 
-## Demo
+**Play at: https://irtaza.itch.io/smashcars**
+
+## Demo Images
 
 ![Gameplay](Images/Gameplay.png)
 
-![TitleScreen](Images/TitleScreenColoured.png)
+![Drifting](Images/Drift.png)
 
 ![SelectionScreen](Images/SelectionScreen.png)
 
 ## Controls
 
-- **W/A/S/D** or **arrow keys** to drive.
-- **S** or **down arrow key** to brake or reverse.
+### Player 1
+
+- **W/A/S/D** to drive.
+- **S** to brake or reverse.
 - **Left shift** for electronic brake. (Can also be used to drift!!)
 - **Q** to shoot with left weapon.
 - **E** to shoot with right weapon.
 - **F** to reload.
 
+### Player 2
+
+- **Arrow keys** to drive.
+- **Down arrow key** to brake or reverse.
+- **Right Control** for electronic brake. (Can also be used to drift!!)
+- **/ (Slash)** to shoot with left weapon.
+- **Right Shift** to shoot with right weapon.
+- **. (Period)** to reload.
+
 ## Credits
 
 Made by **[Irtaza](https://github.com/Irtaza2009)** and **[Aayan](https://github.com/MuhammadAayanMirza)**!
 
-Our submission for **Thirdspace** week 5 and (eventually) week 6!
+Our submission for **Thirdspace** week 5, week 6 and week 7!
