@@ -24,6 +24,10 @@ public class CarHealth : MonoBehaviour
     [SerializeField] private Renderer[] carRenderers;
     [SerializeField] private Behaviour[] disableOnElimination;
 
+    [Header("Player Identification")]
+    [SerializeField] private int playerNumber = 1;
+    [SerializeField] private EndGame endGameManager;
+
     private float currentHealth;
     private bool isEliminated;
     private readonly HashSet<CarHealth> carsDamagedThisImpact =
@@ -156,6 +160,11 @@ public class CarHealth : MonoBehaviour
         }
 
         Debug.Log($"{name} has been eliminated!");
+
+        if (endGameManager != null)
+        {
+            endGameManager.PlayerDied(playerNumber);
+        }
     }
 
     private void UpdateHealthUI()
