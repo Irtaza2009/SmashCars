@@ -22373,7 +22373,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::EndGame
   endGameScreen: {fileID: 1083595648}
-  winnerText: {fileID: 383470732}
+  winnerText: {fileID: 207791023}
+  winnerShadowText: {fileID: 383470732}
 --- !u!4 &922896475
 Transform:
   m_ObjectHideFlags: 0
@@ -33031,15 +33032,15 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 7223128732808110287, guid: ecc5947549b2b48d78b3a9fa363ca59b, type: 3}
       propertyPath: availableColours.Array.data[0].b
-      value: 0.15294118
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 7223128732808110287, guid: ecc5947549b2b48d78b3a9fa363ca59b, type: 3}
       propertyPath: availableColours.Array.data[0].g
-      value: 0.15686275
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 7223128732808110287, guid: ecc5947549b2b48d78b3a9fa363ca59b, type: 3}
       propertyPath: availableColours.Array.data[0].r
-      value: 0.6313726
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 7223128732808110287, guid: ecc5947549b2b48d78b3a9fa363ca59b, type: 3}
       propertyPath: availableColours.Array.data[1].a
@@ -33047,15 +33048,15 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 7223128732808110287, guid: ecc5947549b2b48d78b3a9fa363ca59b, type: 3}
       propertyPath: availableColours.Array.data[1].b
-      value: 0.5372549
+      value: 0.37254903
       objectReference: {fileID: 0}
     - target: {fileID: 7223128732808110287, guid: ecc5947549b2b48d78b3a9fa363ca59b, type: 3}
       propertyPath: availableColours.Array.data[1].g
-      value: 0.101960786
+      value: 0.37254903
       objectReference: {fileID: 0}
     - target: {fileID: 7223128732808110287, guid: ecc5947549b2b48d78b3a9fa363ca59b, type: 3}
       propertyPath: availableColours.Array.data[1].r
-      value: 0.101960786
+      value: 0.37254903
       objectReference: {fileID: 0}
     - target: {fileID: 7223128732808110287, guid: ecc5947549b2b48d78b3a9fa363ca59b, type: 3}
       propertyPath: availableColours.Array.data[2].a
@@ -33063,15 +33064,15 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 7223128732808110287, guid: ecc5947549b2b48d78b3a9fa363ca59b, type: 3}
       propertyPath: availableColours.Array.data[2].b
-      value: 0.15686275
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 7223128732808110287, guid: ecc5947549b2b48d78b3a9fa363ca59b, type: 3}
       propertyPath: availableColours.Array.data[2].g
-      value: 0.6745098
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 7223128732808110287, guid: ecc5947549b2b48d78b3a9fa363ca59b, type: 3}
       propertyPath: availableColours.Array.data[2].r
-      value: 0.37254903
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 7223128732808110287, guid: ecc5947549b2b48d78b3a9fa363ca59b, type: 3}
       propertyPath: availableColours.Array.data[3].a
@@ -33079,15 +33080,15 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 7223128732808110287, guid: ecc5947549b2b48d78b3a9fa363ca59b, type: 3}
       propertyPath: availableColours.Array.data[3].b
-      value: 0.08235294
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 7223128732808110287, guid: ecc5947549b2b48d78b3a9fa363ca59b, type: 3}
       propertyPath: availableColours.Array.data[3].g
-      value: 0.80784315
+      value: 0.5411765
       objectReference: {fileID: 0}
     - target: {fileID: 7223128732808110287, guid: ecc5947549b2b48d78b3a9fa363ca59b, type: 3}
       propertyPath: availableColours.Array.data[3].r
-      value: 0.84705883
+      value: 0.7607843
       objectReference: {fileID: 0}
     - target: {fileID: 7223128732808110287, guid: ecc5947549b2b48d78b3a9fa363ca59b, type: 3}
       propertyPath: carBodies.Array.data[0].CarBodyParts.Array.size

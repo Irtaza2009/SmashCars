@@ -6,6 +6,7 @@ public class EndGame : MonoBehaviour
 {
     public GameObject endGameScreen;
     public TMP_Text winnerText;
+    public TMP_Text winnerShadowText;
 
     private bool gameEnded = false;
 
@@ -20,6 +21,7 @@ public class EndGame : MonoBehaviour
         int winner = playerNumber == 1 ? 2:1;
 
         winnerText.text = "Player " + winner + " wins";
+        winnerShadowText.text = "Player " + winner + " wins";
 
         Time.timeScale = 0f;
 
