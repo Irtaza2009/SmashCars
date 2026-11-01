@@ -128,7 +128,7 @@ public class ArcadeCarController : MonoBehaviour
 
     private void Start()
     {
-        characterLoader = FindFirstObjectByType<LoadCharacter>();
+        characterLoader = GetComponent<LoadCharacter>();
 
         if (characterLoader == null)
         {
@@ -623,16 +623,18 @@ public class ArcadeCarController : MonoBehaviour
     }
 
     private Transform CreateWheelCylinder(
-        Renderer sourceRenderer,
-        float radius)
+    Renderer sourceRenderer,
+    float radius)
     {
         GameObject cylinder = GameObject.CreatePrimitive(
             PrimitiveType.Cylinder
         );
+
         cylinder.name = $"{sourceRenderer.name} Wheel Visual";
         cylinder.layer = gameObject.layer;
 
         Collider cylinderCollider = cylinder.GetComponent<Collider>();
+
         if (cylinderCollider != null)
         {
             cylinderCollider.enabled = false;
@@ -641,22 +643,66 @@ public class ArcadeCarController : MonoBehaviour
 
         cylinder.transform.SetParent(transform, true);
         cylinder.transform.position = sourceRenderer.bounds.center;
-        cylinder.transform.rotation = transform.rotation *
-            Quaternion.Euler(0f, 0f, 90f);
 
-        float width = Mathf.Max(0.05f, sourceRenderer.bounds.size.x);
+        // Align the cylinder with the car's wheel axis.
+        cylinder.transform.rotation =
+            transform.rotation * Quaternion.Euler(0f, 0f, 90f);
+
+        // Measure tyre width in the car's local coordinate space.
+        float width = GetWheelWidthInCarSpace(sourceRenderer);
+
         cylinder.transform.localScale = new Vector3(
             radius * 2f,
             width * 0.5f,
             radius * 2f
         );
 
-        MeshRenderer cylinderRenderer = cylinder.GetComponent<MeshRenderer>();
+        MeshRenderer cylinderRenderer =
+            cylinder.GetComponent<MeshRenderer>();
+
         if (cylinderRenderer != null && tyreMaterial != null)
             cylinderRenderer.sharedMaterial = tyreMaterial;
 
         generatedWheelMeshes.Add(cylinder);
+
         return cylinder.transform;
+    }
+
+    private float GetWheelWidthInCarSpace(Renderer sourceRenderer)
+    {
+        Bounds localBounds = sourceRenderer.localBounds;
+
+        Vector3 min = localBounds.min;
+        Vector3 max = localBounds.max;
+
+        float minX = float.PositiveInfinity;
+        float maxX = float.NegativeInfinity;
+
+        for (int x = 0; x <= 1; x++)
+        {
+            for (int y = 0; y <= 1; y++)
+            {
+                for (int z = 0; z <= 1; z++)
+                {
+                    Vector3 corner = new Vector3(
+                        x == 0 ? min.x : max.x,
+                        y == 0 ? min.y : max.y,
+                        z == 0 ? min.z : max.z
+                    );
+
+                    Vector3 worldCorner =
+                        sourceRenderer.transform.TransformPoint(corner);
+
+                    Vector3 carLocalCorner =
+                        transform.InverseTransformPoint(worldCorner);
+
+                    minX = Mathf.Min(minX, carLocalCorner.x);
+                    maxX = Mathf.Max(maxX, carLocalCorner.x);
+                }
+            }
+        }
+
+        return Mathf.Max(0.05f, maxX - minX);
     }
 
     private void ClearGeneratedWheelMeshes()
