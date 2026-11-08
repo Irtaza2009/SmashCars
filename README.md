@@ -14,7 +14,7 @@ With **split-screen 2-player local multiplayer**!!
 
 ## Demo Video
 
-![Demo GIF](https://cdn.hackclub.com/01a1bb8a-ee71-7da0-b71d-a270af35772a/chrome_xlI5UyPxop-ezgif.com-video-to-gif-converter.gif)
+![Demo Video](https://github.com/user-attachments/assets/c5dd3ca8-0802-4b3b-9b1c-6cf71170681d)
 
 ## Demo Images
 
