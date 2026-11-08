@@ -1,28 +1,26 @@
 # SmashCars
 
-**Demolition Derby** meets **Battle Royale**!!
+**Demolition Derby** meets **Battle Royale**!! A split-screen multiplayer game made in Unity!
 
 Drive cars in an arena, use your weapons, or ram other cars, and try to be the last car standing to win!!
 
 There are **3 different tracks** (all made by us from scratch!), and you randomly spawn in one each time!
 
-All 3d models are made by us!!
+All 3d models, cars, and tracks are made by us!!
 
 With **split-screen 2-player local multiplayer**!!
 
 **Play at: https://irtaza.itch.io/smashcars**
 
-## Gameplay
+## Demo Video
 
-![GameplayGIF](https://cdn.hackclub.com/01a1b9ee-62fb-7bae-b8f5-91c2f0397e57/SmashCarsGameplay.gif)
+![Demo GIF](https://cdn.hackclub.com/01a1bb8a-ee71-7da0-b71d-a270af35772a/chrome_xlI5UyPxop-ezgif.com-video-to-gif-converter.gif)
 
 ## Demo Images
 
-![Gameplay](Images/Gameplay.png)
-
-![Drifting](Images/Drift.png)
-
-![SelectionScreen](Images/SelectionScreen.png)
+| ![Gameplay](Images/Gameplay.png) | ![Drifting](Images/Drift.png) | ![SelectionScreen](Images/SelectionScreen.png) |
+| :---: | :---: | :---: |
+| Gameplay | Drifting | Selection Screen |
 
 ## Controls
 
