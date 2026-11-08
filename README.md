@@ -14,7 +14,7 @@ With **split-screen 2-player local multiplayer**!!
 
 ## Demo Video
 
-[Demo Video](https://github.com/user-attachments/assets/c5dd3ca8-0802-4b3b-9b1c-6cf71170681d)
+[Demo Video](https://github.com/user-attachments/assets/56de93ab-092d-4731-b6f8-f8d2043b05f9)
 
 ## Demo Images
 
