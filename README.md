@@ -12,6 +12,10 @@ With **split-screen 2-player local multiplayer**!!
 
 **Play at: https://irtaza.itch.io/smashcars**
 
+## Gameplay
+
+![GameplayGIF](https://cdn.hackclub.com/01a1b9ee-62fb-7bae-b8f5-91c2f0397e57/SmashCarsGameplay.gif)
+
 ## Demo Images
 
 ![Gameplay](Images/Gameplay.png)
